@@ -1,12 +1,6 @@
 import { env } from './config/env.js'
-import { connectDb } from './config/db.js'
-import { seedAuth } from './seed/seedAuth.js'
-import { createApp } from './app.js'
+import app from '../server.js'
 
-await connectDb()
-await seedAuth()
-
-const app = createApp()
 const server = app.listen(env.port, () => {
   console.log(`API listening on port ${env.port}`)
 })
