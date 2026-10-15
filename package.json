@@ -1,0 +1,27 @@
+{
+  "name": "erp-gulzar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node scripts/check-foundation.js",
+    "check:auth": "node scripts/check-auth.js",
+    "seed": "node src/seed/run.js"
+  },
+  "dependencies": {
+    "@scalar/express-api-reference": "0.8.28",
+    "bcryptjs": "3.0.2",
+    "compression": "1.8.1",
+    "cors": "2.8.5",
+    "decimal.js": "10.6.0",
+    "dotenv": "17.2.3",
+    "express": "4.21.2",
+    "helmet": "8.1.0",
+    "joi": "17.13.3",
+    "jsonwebtoken": "9.0.2",
+    "mongoose": "8.19.2",
+    "morgan": "1.10.1"
+  }
+}

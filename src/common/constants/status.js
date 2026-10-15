@@ -1,0 +1,6 @@
+export const MASTER_STATUS = ['active', 'inactive']
+export const USER_STATUS = ['active', 'locked', 'inactive']
+export const DOCUMENT_STATUS = ['draft', 'approved', 'posted', 'cancelled']
+export const APPROVAL_STATUS = ['draft', 'pending', 'approved', 'rejected', 'cancelled']
+export const TRANSFER_STATUS = ['draft', 'in_transit', 'received', 'cancelled']
+export const SHIPMENT_STATUS = ['pending', 'prepared', 'dispatched', 'in_transit', 'delivered', 'cancelled']
