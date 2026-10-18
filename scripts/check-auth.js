@@ -89,15 +89,10 @@ async function ensureLimitedUser(request, token, roleId) {
   assert(user, 'limited check user was not found')
   const updated = await request('PATCH', `/api/v1/users/${user._id}`, {
     token,
-    body: { password: LIMITED_PASSWORD, status: 'active' },
+    body: { password: LIMITED_PASSWORD, status: 'active', roleIds: [roleId] },
   })
   assertStatus(updated, 200, 'reactivate check user')
-  const access = await request('PATCH', `/api/v1/users/${user._id}/access`, {
-    token,
-    body: { roleIds: [roleId] },
-  })
-  assertStatus(access, 200, 'reset check user role')
-  return access.json.data
+  return updated.json.data
 }
 
 scopeChecks()
@@ -202,7 +197,6 @@ try {
     '/api/v1/auth/me',
     '/api/v1/users',
     '/api/v1/users/{id}',
-    '/api/v1/users/{id}/access',
     '/api/v1/roles',
     '/api/v1/roles/{id}',
     '/api/v1/permissions',

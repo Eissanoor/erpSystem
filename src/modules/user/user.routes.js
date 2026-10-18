@@ -3,7 +3,7 @@ import { validate } from '../../common/middleware/validate.js'
 import { authenticate } from '../../common/middleware/authenticate.js'
 import { authorize } from '../../common/middleware/authorize.js'
 import { idParams } from '../../common/validation/common.js'
-import { createUserBody, updateAccessBody, updateUserBody, userListQuery } from './user.validation.js'
+import { createUserBody, updateUserBody, userListQuery } from './user.validation.js'
 import * as userController from './user.controller.js'
 
 export const userRouter = Router()
@@ -22,14 +22,6 @@ userRouter.post(
   authorize('user', 'create'),
   validate({ body: createUserBody }),
   userController.create,
-)
-
-userRouter.patch(
-  '/:id/access',
-  authenticate,
-  authorize('user', 'update'),
-  validate({ params: idParams, body: updateAccessBody }),
-  userController.updateAccess,
 )
 
 userRouter.get(

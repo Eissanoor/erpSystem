@@ -23,10 +23,7 @@ export const updateUserBody = Joi.object({
   phone: Joi.string().trim().allow('').max(30),
   employeeId: objectId.allow(null),
   status: Joi.string().valid(...USER_STATUS),
-}).min(1)
-
-export const updateAccessBody = Joi.object({
   roleIds: objectIdList,
   branchIds: objectIdList,
   warehouseIds: objectIdList,
-}).or('roleIds', 'branchIds', 'warehouseIds')
+}).min(1)

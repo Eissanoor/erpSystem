@@ -21,8 +21,3 @@ export const update = asyncHandler(async (req, res) => {
   const data = await userService.update(req.params.id, req.body)
   sendSuccess(res, { message: 'User updated', data })
 })
-
-export const updateAccess = asyncHandler(async (req, res) => {
-  const data = await userService.updateAccess(req.params.id, req.body)
-  sendSuccess(res, { message: 'Access updated', data })
-})

@@ -6,7 +6,7 @@ import { userPaths } from './paths/users.js'
 const objectId = { type: 'string', pattern: '^[a-fA-F0-9]{24}$' }
 const objectIdArray = { type: 'array', items: objectId }
 
-export function buildOpenApiSpec() {
+export function buildOpenApiSpec(serverUrl = '/') {
   return {
     openapi: '3.0.3',
     info: {
@@ -15,7 +15,7 @@ export function buildOpenApiSpec() {
       description:
         'Single-client ERP. Branch is the top-level location. Protected routes use bearerAuth. Logout does not revoke the access token before JWT_ACCESS_EXPIRES (default 15 minutes).',
     },
-    servers: [{ url: '/' }],
+    servers: [{ url: serverUrl }],
     tags: [
       { name: 'Health', description: 'Service health' },
       { name: 'Auth', description: 'Login, refresh, and the current user' },
@@ -211,11 +211,6 @@ export function buildOpenApiSpec() {
             phone: { type: 'string' },
             employeeId: { ...objectId, nullable: true },
             status: { type: 'string', enum: ['active', 'locked', 'inactive'] },
-          },
-        },
-        UserAccess: {
-          type: 'object',
-          properties: {
             roleIds: objectIdArray,
             branchIds: objectIdArray,
             warehouseIds: objectIdArray,

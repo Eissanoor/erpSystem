@@ -3,7 +3,6 @@ import { bearer, error, idParam, listParams, statusParam, success } from '../sha
 const user = { $ref: '#/components/schemas/User' }
 const userWrite = { $ref: '#/components/schemas/UserCreate' }
 const userPatch = { $ref: '#/components/schemas/UserUpdate' }
-const access = { $ref: '#/components/schemas/UserAccess' }
 
 const userListParams = [...listParams, statusParam(['active', 'locked', 'inactive'])]
 
@@ -56,8 +55,9 @@ export const userPaths = {
     patch: {
       tags: ['Users'],
       operationId: 'updateUser',
-      summary: 'Update profile fields',
-      description: 'Role, branch, and warehouse access are changed on PATCH /users/{id}/access.',
+      summary: 'Update a user',
+      description:
+        'Any writable field can be sent, including roleIds, branchIds, and warehouseIds. Branch and warehouse ids are stored as given. Existence checks start in stage 2, when those collections exist. This deletes the auth:user:{id} cache.',
       security: bearer,
       parameters: idParam,
       requestBody: {
@@ -71,28 +71,6 @@ export const userPaths = {
         403: error('Missing user.update'),
         404: error('User not found'),
         409: error('Email already exists'),
-      },
-    },
-  },
-  '/api/v1/users/{id}/access': {
-    patch: {
-      tags: ['Users'],
-      operationId: 'updateUserAccess',
-      summary: 'Update roles, branches, and warehouses',
-      description:
-        'Branch and warehouse ids are stored as given. Existence checks start in stage 2, when those collections exist. This deletes the auth:user:{id} cache.',
-      security: bearer,
-      parameters: idParam,
-      requestBody: {
-        required: true,
-        content: { 'application/json': { schema: access } },
-      },
-      responses: {
-        200: success('Access updated', user),
-        400: error('Validation failed'),
-        401: error('Authentication required'),
-        403: error('Missing user.update'),
-        404: error('User not found'),
       },
     },
   },

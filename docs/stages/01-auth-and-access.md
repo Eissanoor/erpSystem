@@ -29,8 +29,7 @@ Add new permission rows in the same stage that adds a module. Do not check permi
 | POST | `/api/v1/auth/logout` | authenticated |
 | GET | `/api/v1/auth/me` | authenticated |
 | GET/POST | `/api/v1/users` | `user.read` / `user.create` |
-| GET/PATCH | `/api/v1/users/:id` | `user.read` / `user.update` |
-| PATCH | `/api/v1/users/:id/access` | `user.update` (roleIds, branchIds, warehouseIds) |
+| GET/PATCH | `/api/v1/users/:id` | `user.read` / `user.update` (profile, password, roleIds, branchIds, warehouseIds) |
 | GET/POST | `/api/v1/roles` | `role.read` / `role.create` |
 | GET/PATCH | `/api/v1/roles/:id` | `role.read` / `role.update` |
 | GET | `/api/v1/permissions` | `permission.read` |
@@ -46,7 +45,7 @@ No delete routes. Set `status` to `inactive` or `locked`.
 
 ## Cache
 
-After login, cache `auth:user:{id}` with the permission codes and allowed branch/warehouse ids. TTL 10 minutes. `PATCH` user access and role permission changes call `cache.del`. Logout can keep the access token until expiry (15 minutes). Document that limitation in Scalar; a denylist is stage 12 if you need instant revoke.
+After login, cache `auth:user:{id}` with the permission codes and allowed branch/warehouse ids. TTL 10 minutes. `PATCH` user and role permission changes call `cache.del`. Logout can keep the access token until expiry (15 minutes). Document that limitation in Scalar; a denylist is stage 12 if you need instant revoke.
 
 ## Middleware to add
 

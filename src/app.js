@@ -17,16 +17,34 @@ import { userRouter } from './modules/user/user.routes.js'
 import { roleRouter } from './modules/role/role.routes.js'
 import { permissionRouter } from './modules/permission/permission.routes.js'
 
+function requestOrigin(req) {
+  const forwarded = req.get('x-forwarded-proto')
+  const proto = forwarded ? forwarded.split(',')[0].trim() : req.protocol
+  return `${proto}://${req.get('host')}`
+}
+
 export function createApp() {
   const app = express()
-  const openApiSpec = buildOpenApiSpec()
 
   app.use(
     helmet({
       contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      strictTransportSecurity: env.isProduction,
     }),
   )
-  app.use(cors())
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
+    next()
+  })
+  app.use(
+    cors({
+      origin: true,
+      credentials: true,
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Request-Id'],
+    }),
+  )
   app.use(compression({ threshold: 1024 }))
   app.use(express.json({ limit: '1mb' }))
   app.use((req, res, next) => {
@@ -53,15 +71,16 @@ export function createApp() {
   )
 
   app.get('/openapi.json', (req, res) => {
-    res.json(openApiSpec)
+    res.json(buildOpenApiSpec(requestOrigin(req)))
   })
 
-  app.use(
-    '/docs',
+  app.use('/docs', (req, res) => {
     apiReference({
-      content: openApiSpec,
-    }),
-  )
+      content: buildOpenApiSpec(requestOrigin(req)),
+      // Scalar's hosted proxy cannot reach localhost and the browser shows that as "Failed to fetch".
+      proxyUrl: '',
+    })(req, res)
+  })
 
   app.use('/api/v1/auth', authRouter)
   app.use('/api/v1/users', userRouter)

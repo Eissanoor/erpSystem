@@ -77,7 +77,18 @@ export async function create(body) {
 
 export async function update(id, body) {
   const user = assertFound(await User.findById(id).select('+passwordHash'), 'User not found')
-  const changes = pick(body, ['name', 'email', 'phone', 'status', 'employeeId'])
+  if (body.roleIds) await assertActiveRoles(body.roleIds)
+  // Branch and warehouse ids are stored unchecked until those models exist (stage 2).
+  const changes = pick(body, [
+    'name',
+    'email',
+    'phone',
+    'status',
+    'employeeId',
+    'roleIds',
+    'branchIds',
+    'warehouseIds',
+  ])
   if (body.password) changes.passwordHash = await hashPassword(body.password)
   user.set(changes)
   try {
@@ -85,16 +96,6 @@ export async function update(id, body) {
   } catch (error) {
     rethrowDuplicate(error, 'email', 'Email already exists')
   }
-  clearAuthUser(user._id)
-  return loadUser(user._id)
-}
-
-export async function updateAccess(id, body) {
-  const user = assertFound(await User.findById(id).select('+passwordHash'), 'User not found')
-  if (body.roleIds) await assertActiveRoles(body.roleIds)
-  // Branch and warehouse ids are stored unchecked until those models exist (stage 2).
-  user.set(pick(body, ['roleIds', 'branchIds', 'warehouseIds']))
-  await user.save()
   clearAuthUser(user._id)
   return loadUser(user._id)
 }
