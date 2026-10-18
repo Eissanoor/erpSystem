@@ -4,8 +4,11 @@ import { clearAuthUsersForRole } from '../modules/auth/auth.cache.js'
 import { Permission } from '../modules/permission/permission.model.js'
 import { Role } from '../modules/role/role.model.js'
 import { User } from '../modules/user/user.model.js'
+import { Branch } from '../modules/branch/branch.model.js'
+import { Warehouse } from '../modules/warehouse/warehouse.model.js'
+import { Shop } from '../modules/shop/shop.model.js'
 
-const MODULES = ['user', 'role', 'permission']
+const MODULES = ['user', 'role', 'permission', 'branch', 'warehouse', 'shop']
 const ACTIONS = ['create', 'read', 'update']
 
 export const SEEDED_PERMISSIONS = [
@@ -32,7 +35,14 @@ export async function seedAuth() {
     throw new Error('Set SEED_ADMIN_EMAIL before starting')
   }
 
-  await Promise.all([Permission.init(), Role.init(), User.init()])
+  await Promise.all([
+    Permission.init(),
+    Role.init(),
+    User.init(),
+    Branch.init(),
+    Warehouse.init(),
+    Shop.init(),
+  ])
 
   await Permission.bulkWrite(
     SEEDED_PERMISSIONS.map((permission) => ({

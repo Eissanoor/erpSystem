@@ -1,4 +1,5 @@
 import Joi from 'joi'
+import { MASTER_STATUS } from '../constants/status.js'
 
 export const objectId = Joi.string().hex().length(24)
 
@@ -16,6 +17,17 @@ export const codeField = Joi.string()
   .trim()
   .lowercase()
   .pattern(/^[a-z][a-z0-9_]{1,40}$/)
+
+export const locationCode = Joi.string()
+  .trim()
+  .uppercase()
+  .pattern(/^[A-Z0-9][A-Z0-9-]{0,31}$/)
+
+export const masterStatusBody = Joi.object({
+  status: Joi.string()
+    .valid(...MASTER_STATUS)
+    .required(),
+})
 
 export function listQuery(statusValues) {
   return Joi.object({

@@ -16,6 +16,9 @@ import { authRouter } from './modules/auth/auth.routes.js'
 import { userRouter } from './modules/user/user.routes.js'
 import { roleRouter } from './modules/role/role.routes.js'
 import { permissionRouter } from './modules/permission/permission.routes.js'
+import { branchRouter } from './modules/branch/branch.routes.js'
+import { warehouseRouter } from './modules/warehouse/warehouse.routes.js'
+import { shopRouter } from './modules/shop/shop.routes.js'
 
 function requestOrigin(req) {
   const forwarded = req.get('x-forwarded-proto')
@@ -86,6 +89,9 @@ export function createApp() {
   app.use('/api/v1/users', userRouter)
   app.use('/api/v1/roles', roleRouter)
   app.use('/api/v1/permissions', permissionRouter)
+  app.use('/api/v1/branches', branchRouter)
+  app.use('/api/v1/warehouses', warehouseRouter)
+  app.use('/api/v1/shops', shopRouter)
 
   app.use(notFound)
   app.use(errorHandler)

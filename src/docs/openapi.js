@@ -1,7 +1,10 @@
 import { authPaths } from './paths/auth.js'
+import { branchPaths } from './paths/branches.js'
 import { permissionPaths } from './paths/permissions.js'
 import { rolePaths } from './paths/roles.js'
+import { shopPaths } from './paths/shops.js'
 import { userPaths } from './paths/users.js'
+import { warehousePaths } from './paths/warehouses.js'
 
 const objectId = { type: 'string', pattern: '^[a-fA-F0-9]{24}$' }
 const objectIdArray = { type: 'array', items: objectId }
@@ -11,7 +14,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
     openapi: '3.0.3',
     info: {
       title: 'ERP Gulzar API',
-      version: '0.2.0',
+      version: '0.3.0',
       description:
         'Single-client ERP. Branch is the top-level location. Protected routes use bearerAuth. Logout does not revoke the access token before JWT_ACCESS_EXPIRES (default 15 minutes).',
     },
@@ -22,6 +25,9 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Users', description: 'User accounts and access' },
       { name: 'Roles', description: 'Permission groups' },
       { name: 'Permissions', description: 'Module action codes' },
+      { name: 'Branches', description: 'Top-level locations' },
+      { name: 'Warehouses', description: 'Inventory locations under a branch' },
+      { name: 'Shops', description: 'Sales locations under a branch' },
     ],
     paths: {
       '/health': {
@@ -44,6 +50,9 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...userPaths,
       ...rolePaths,
       ...permissionPaths,
+      ...branchPaths,
+      ...warehousePaths,
+      ...shopPaths,
     },
     components: {
       securitySchemes: {
@@ -253,6 +262,132 @@ export function buildOpenApiSpec(serverUrl = '/') {
             name: { type: 'string' },
             code: { type: 'string' },
             permissionIds: objectIdArray,
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        MasterStatus: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        BranchRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+          },
+        },
+        Branch: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string', example: 'KHI' },
+            phone: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        BranchWrite: {
+          type: 'object',
+          required: ['name', 'code'],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            phone: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true, description: 'Null until Employee exists' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        BranchUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string' },
+            phone: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        Warehouse: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            name: { type: 'string' },
+            code: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        WarehouseWrite: {
+          type: 'object',
+          required: ['branchId', 'name', 'code'],
+          properties: {
+            branchId: objectId,
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        WarehouseUpdate: {
+          type: 'object',
+          properties: {
+            branchId: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        Shop: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            name: { type: 'string' },
+            code: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        ShopWrite: {
+          type: 'object',
+          required: ['branchId', 'name', 'code'],
+          properties: {
+            branchId: objectId,
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        ShopUpdate: {
+          type: 'object',
+          properties: {
+            branchId: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+            address: { type: 'string' },
+            managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
         },

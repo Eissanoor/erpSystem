@@ -7,6 +7,8 @@ import { rethrowDuplicate } from '../../common/utils/duplicateKey.js'
 import { clearAuthUser } from '../auth/auth.cache.js'
 import { hashPassword } from '../auth/password.js'
 import { Role } from '../role/role.model.js'
+import { Branch } from '../branch/branch.model.js'
+import { Warehouse } from '../warehouse/warehouse.model.js'
 import { User } from './user.model.js'
 
 const SORT_FIELDS = ['name', 'email', 'status', 'createdAt']
@@ -26,6 +28,27 @@ async function assertActiveRoles(ids) {
   if (roles.some((role) => role.status !== 'active')) {
     throw new ApiError(400, 'Inactive role', [
       { field: 'roleIds', message: 'Roles must be active' },
+    ])
+  }
+}
+
+async function assertIdsExist(Model, ids, field, message) {
+  const unique = [...new Set((ids || []).map(String))]
+  if (!unique.length) return []
+  const rows = await Model.find({ _id: { $in: unique } }).select('_id branchId').lean()
+  if (rows.length !== unique.length) {
+    throw new ApiError(400, message, [{ field, message: 'One or more ids do not exist' }])
+  }
+  return rows
+}
+
+async function assertLocationAssignment(branchIds, warehouseIds) {
+  await assertIdsExist(Branch, branchIds, 'branchIds', 'Unknown branch')
+  const warehouses = await assertIdsExist(Warehouse, warehouseIds, 'warehouseIds', 'Unknown warehouse')
+  const allowed = new Set((branchIds || []).map(String))
+  if (warehouses.some((warehouse) => !allowed.has(String(warehouse.branchId)))) {
+    throw new ApiError(400, 'Warehouse is outside the assigned branches', [
+      { field: 'warehouseIds', message: 'Each warehouse must belong to one of the branchIds' },
     ])
   }
 }
@@ -57,6 +80,7 @@ export async function getById(id) {
 
 export async function create(body) {
   await assertActiveRoles(body.roleIds)
+  await assertLocationAssignment(body.branchIds || [], body.warehouseIds || [])
   try {
     const user = await User.create({
       name: body.name,
@@ -78,7 +102,12 @@ export async function create(body) {
 export async function update(id, body) {
   const user = assertFound(await User.findById(id).select('+passwordHash'), 'User not found')
   if (body.roleIds) await assertActiveRoles(body.roleIds)
-  // Branch and warehouse ids are stored unchecked until those models exist (stage 2).
+  if (body.branchIds || body.warehouseIds) {
+    await assertLocationAssignment(
+      body.branchIds ?? user.branchIds,
+      body.warehouseIds ?? user.warehouseIds,
+    )
+  }
   const changes = pick(body, [
     'name',
     'email',
