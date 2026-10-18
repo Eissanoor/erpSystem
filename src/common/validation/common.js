@@ -23,6 +23,8 @@ export const locationCode = Joi.string()
   .uppercase()
   .pattern(/^[A-Z0-9][A-Z0-9-]{0,31}$/)
 
+export const currencyCode = Joi.string().trim().uppercase().length(3).pattern(/^[A-Z]{3}$/)
+
 export const masterStatusBody = Joi.object({
   status: Joi.string()
     .valid(...MASTER_STATUS)

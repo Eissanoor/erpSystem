@@ -5,6 +5,7 @@ import { createApp } from '../src/app.js'
 import { seedAuth } from '../src/seed/seedAuth.js'
 import { cache } from '../src/common/utils/cache.js'
 import { Branch } from '../src/modules/branch/branch.model.js'
+import { Currency } from '../src/modules/currency/currency.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
 const LIMITED_PASSWORD = 'OrgLimited1'
@@ -185,7 +186,7 @@ try {
 
   const permissions = await request('GET', '/api/v1/permissions?limit=100', { token: adminToken })
   assertStatus(permissions, 200, 'list permissions')
-  const needed = ['branch.read', 'warehouse.read', 'warehouse.create', 'shop.read', 'shop.create']
+  const needed = ['branch.read', 'warehouse.read', 'warehouse.create', 'shop.read', 'shop.create', 'currency.read']
   const permissionIds = needed.map((code) => {
     const permission = permissions.json.data.find((item) => item.code === code)
     assert(permission, `${code} is seeded`)
@@ -346,6 +347,116 @@ try {
   await Branch.deleteOne({ _id: cacheBranch.json.data._id })
   cache.delByPrefix('org:branches')
 
+  async function ensureCurrency(body) {
+    const code = body.code.toUpperCase()
+    const listed = await request('GET', `/api/v1/currencies?search=${code}&limit=20`, { token: adminToken })
+    assertStatus(listed, 200, `search currency ${code}`)
+    const found = listed.json.data.find((item) => item.code === code)
+    if (!found) {
+      const created = await request('POST', '/api/v1/currencies', { token: adminToken, body })
+      assertStatus(created, 201, `create currency ${code}`)
+      return created.json.data
+    }
+    const updated = await request('PATCH', `/api/v1/currencies/${found._id}`, { token: adminToken, body })
+    assertStatus(updated, 200, `reset currency ${code}`)
+    return updated.json.data
+  }
+
+  const pkr = await ensureCurrency({
+    name: 'Pakistani Rupee',
+    code: 'pkr',
+    symbol: 'Rs',
+    decimalPlaces: 2,
+    isBaseCurrency: true,
+    status: 'active',
+  })
+  assert(pkr.code === 'PKR', 'currency code is stored uppercase')
+  const usd = await ensureCurrency({
+    name: 'US Dollar',
+    code: 'usd',
+    symbol: '$',
+    decimalPlaces: 2,
+    isBaseCurrency: true,
+    status: 'active',
+  })
+  const pkrAfterUsd = await request('GET', `/api/v1/currencies/${pkr._id}`, { token: adminToken })
+  assertStatus(pkrAfterUsd, 200, 'get PKR')
+  assert(usd.isBaseCurrency === true, 'USD is the base currency')
+  assert(pkrAfterUsd.json.data.isBaseCurrency === false, 'PKR is cleared when USD becomes base')
+
+  const pkrBase = await request('PATCH', `/api/v1/currencies/${pkr._id}`, {
+    token: adminToken,
+    body: { isBaseCurrency: true },
+  })
+  assertStatus(pkrBase, 200, 'set PKR as base')
+  const usdAfterPkr = await request('GET', `/api/v1/currencies/${usd._id}`, { token: adminToken })
+  assertStatus(usdAfterPkr, 200, 'get USD')
+  assert(pkrBase.json.data.isBaseCurrency === true, 'PKR is the base currency')
+  assert(usdAfterPkr.json.data.isBaseCurrency === false, 'USD is cleared when PKR becomes base')
+
+  const allCurrencies = await request('GET', '/api/v1/currencies?limit=100', { token: adminToken })
+  assertStatus(allCurrencies, 200, 'list currencies')
+  const baseRows = allCurrencies.json.data.filter((item) => item.isBaseCurrency)
+  assert(baseRows.length === 1 && baseRows[0].code === 'PKR', 'only one base currency')
+
+  const scopedCurrencies = await request('GET', '/api/v1/currencies?limit=100', { token: limitedToken })
+  assertStatus(scopedCurrencies, 200, 'limited user lists currencies')
+  assert(scopedCurrencies.json.data.some((item) => item.code === 'PKR'), 'currency list is not limited to a branch')
+  assert(scopedCurrencies.json.data.some((item) => item.code === 'USD'), 'limited user still sees USD')
+
+  const badPlaces = await request('POST', '/api/v1/currencies', {
+    token: adminToken,
+    body: { name: 'Bad Places', code: 'EUR', decimalPlaces: 7 },
+  })
+  assertStatus(badPlaces, 400, 'decimalPlaces above 6')
+  const shortCode = await request('POST', '/api/v1/currencies', {
+    token: adminToken,
+    body: { name: 'Short', code: 'US' },
+  })
+  assertStatus(shortCode, 400, 'currency code must be 3 letters')
+
+  const cacheCurrency = await ensureCurrency({
+    name: 'Cache Currency',
+    code: 'zzz',
+    symbol: 'Z',
+    decimalPlaces: 0,
+    isBaseCurrency: false,
+    status: 'active',
+  })
+  const currencyDropdown = '/api/v1/currencies?status=active&page=1&limit=20'
+  const firstCurrencies = await request('GET', currencyDropdown, { token: adminToken })
+  assertStatus(firstCurrencies, 200, 'first active currency list')
+  assert(
+    firstCurrencies.json.data.find((item) => item.code === 'ZZZ')?.name === 'Cache Currency',
+    'ZZZ is on the active currency dropdown',
+  )
+  await Currency.updateOne({ _id: cacheCurrency._id }, { $set: { name: 'Stale Currency' } })
+  const secondCurrencies = await request('GET', currencyDropdown, { token: adminToken })
+  assert(
+    secondCurrencies.json.data.find((item) => item.code === 'ZZZ')?.name === 'Cache Currency',
+    'second currency dropdown is served from cache',
+  )
+  const freshCurrency = await request('PATCH', `/api/v1/currencies/${cacheCurrency._id}`, {
+    token: adminToken,
+    body: { name: 'Fresh Currency' },
+  })
+  assertStatus(freshCurrency, 200, 'update cache currency')
+  const thirdCurrencies = await request('GET', currencyDropdown, { token: adminToken })
+  assert(
+    thirdCurrencies.json.data.find((item) => item.code === 'ZZZ')?.name === 'Fresh Currency',
+    'currency dropdown refreshes after update',
+  )
+  const inactiveCurrency = await request('PATCH', `/api/v1/currencies/${cacheCurrency._id}/status`, {
+    token: adminToken,
+    body: { status: 'inactive' },
+  })
+  assertStatus(inactiveCurrency, 200, 'inactivate currency')
+  assert(inactiveCurrency.json.data.status === 'inactive', 'currency status is inactive')
+  const currencyStill = await request('GET', `/api/v1/currencies/${cacheCurrency._id}`, { token: adminToken })
+  assertStatus(currencyStill, 200, 'inactive currency still exists')
+  await Currency.deleteOne({ _id: cacheCurrency._id })
+  cache.delByPrefix('org:currencies')
+
   const specRes = await request('GET', '/openapi.json')
   assertStatus(specRes, 200, 'openapi')
   const requiredPaths = [
@@ -358,6 +469,9 @@ try {
     '/api/v1/shops',
     '/api/v1/shops/{id}',
     '/api/v1/shops/{id}/status',
+    '/api/v1/currencies',
+    '/api/v1/currencies/{id}',
+    '/api/v1/currencies/{id}/status',
   ]
   for (const path of requiredPaths) {
     assert(specRes.json.paths[path], `openapi missing ${path}`)

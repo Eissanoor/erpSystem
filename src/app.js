@@ -19,6 +19,7 @@ import { permissionRouter } from './modules/permission/permission.routes.js'
 import { branchRouter } from './modules/branch/branch.routes.js'
 import { warehouseRouter } from './modules/warehouse/warehouse.routes.js'
 import { shopRouter } from './modules/shop/shop.routes.js'
+import { currencyRouter } from './modules/currency/currency.routes.js'
 
 function requestOrigin(req) {
   const forwarded = req.get('x-forwarded-proto')
@@ -92,6 +93,7 @@ export function createApp() {
   app.use('/api/v1/branches', branchRouter)
   app.use('/api/v1/warehouses', warehouseRouter)
   app.use('/api/v1/shops', shopRouter)
+  app.use('/api/v1/currencies', currencyRouter)
 
   app.use(notFound)
   app.use(errorHandler)

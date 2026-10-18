@@ -5,6 +5,7 @@ import { rolePaths } from './paths/roles.js'
 import { shopPaths } from './paths/shops.js'
 import { userPaths } from './paths/users.js'
 import { warehousePaths } from './paths/warehouses.js'
+import { currencyPaths } from './paths/currencies.js'
 
 const objectId = { type: 'string', pattern: '^[a-fA-F0-9]{24}$' }
 const objectIdArray = { type: 'array', items: objectId }
@@ -14,7 +15,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
     openapi: '3.0.3',
     info: {
       title: 'ERP Gulzar API',
-      version: '0.3.0',
+      version: '0.4.0',
       description:
         'Single-client ERP. Branch is the top-level location. Protected routes use bearerAuth. Logout does not revoke the access token before JWT_ACCESS_EXPIRES (default 15 minutes).',
     },
@@ -28,6 +29,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Branches', description: 'Top-level locations' },
       { name: 'Warehouses', description: 'Inventory locations under a branch' },
       { name: 'Shops', description: 'Sales locations under a branch' },
+      { name: 'Currencies', description: 'Global currency master' },
     ],
     paths: {
       '/health': {
@@ -53,6 +55,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...branchPaths,
       ...warehousePaths,
       ...shopPaths,
+      ...currencyPaths,
     },
     components: {
       securitySchemes: {
@@ -388,6 +391,43 @@ export function buildOpenApiSpec(serverUrl = '/') {
             code: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        Currency: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string', example: 'PKR', minLength: 3, maxLength: 3 },
+            symbol: { type: 'string' },
+            decimalPlaces: { type: 'integer', minimum: 0, maximum: 6 },
+            isBaseCurrency: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        CurrencyWrite: {
+          type: 'object',
+          required: ['name', 'code'],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', minLength: 3, maxLength: 3, description: 'Stored uppercase, for example PKR' },
+            symbol: { type: 'string' },
+            decimalPlaces: { type: 'integer', minimum: 0, maximum: 6, default: 2 },
+            isBaseCurrency: { type: 'boolean', description: 'Setting true clears the previous base currency' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        CurrencyUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', minLength: 3, maxLength: 3 },
+            symbol: { type: 'string' },
+            decimalPlaces: { type: 'integer', minimum: 0, maximum: 6 },
+            isBaseCurrency: { type: 'boolean' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
         },

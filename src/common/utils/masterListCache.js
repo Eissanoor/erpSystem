@@ -6,6 +6,7 @@ export const ORG_CACHE = {
   branches: 'org:branches',
   warehouses: 'org:warehouses',
   shops: 'org:shops',
+  currencies: 'org:currencies',
 }
 
 export function isDropdownList(query) {
