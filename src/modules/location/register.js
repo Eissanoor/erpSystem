@@ -49,8 +49,8 @@ export async function attachBranchUsage(branches) {
 export async function childLocations(branchId, user) {
   const filter = user ? scopeToBranches({ branchId }, user) : { branchId }
   const [warehouses, shops] = await Promise.all([
-    Warehouse.find(filter).select('name code status').sort({ name: 1 }).lean(),
-    Shop.find(filter).select('name code status').sort({ name: 1 }).lean(),
+    Warehouse.find(filter).select('name code managerId status').sort({ code: 1 }).lean(),
+    Shop.find(filter).select('name code managerId status').sort({ code: 1 }).lean(),
   ])
   return [
     ...warehouses.map((row) => ({ ...row, type: 'warehouse' })),

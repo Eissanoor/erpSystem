@@ -10,5 +10,11 @@ export const branchPaths = locationPaths({
   updateSchema: '#/components/schemas/BranchUpdate',
   permission: 'branch',
   workspace: true,
+  detailDescription:
+    'Branch view for one branch: profile, the organization cards in summary, and the shops and warehouses table in locations. Pass page and limit to page that table.',
+  detailParameters: [
+    { $ref: '#/components/parameters/page' },
+    { $ref: '#/components/parameters/limit' },
+  ],
   statusDescription: 'Sets active or inactive. Warehouses and shops under this branch stay as they are.',
 })

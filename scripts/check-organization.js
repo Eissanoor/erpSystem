@@ -178,6 +178,13 @@ try {
   assertStatus(branchPage, 200, 'branch page detail')
   assert(branchPage.json.data.warehouseCount >= 1, 'branch detail counts warehouses')
   assert(branchPage.json.data.shopCount >= 1, 'branch detail counts shops')
+  assert(branchPage.json.data.summary?.branches?.total >= 1, 'branch view includes the cards')
+  assert(branchPage.json.data.summary.warehouses.total >= 1, 'branch view counts warehouses on the cards')
+  assert(branchPage.json.data.locationsMeta?.total >= 2, 'shops and warehouses table has a total')
+  const locationRow = branchPage.json.data.locations.find((row) => row.code === 'ORG-WA')
+  assert(locationRow?.name === 'Org Warehouse A', 'table location is the warehouse name')
+  assert(locationRow.type === 'warehouse', 'table type is warehouse')
+  assert(locationRow.managerId == null, 'custodian is empty until employees exist')
   assert(
     branchPage.json.data.locations[0]?.type === 'warehouse',
     'branch hierarchy lists warehouses before shops',

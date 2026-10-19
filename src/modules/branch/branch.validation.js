@@ -22,6 +22,11 @@ const document = Joi.object({
 
 export const branchListQuery = listQuery(MASTER_STATUS)
 
+export const branchDetailQuery = Joi.object({
+  page: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(1).max(100),
+})
+
 export const createBranchBody = Joi.object({
   name: name.required(),
   code: locationCode.required(),

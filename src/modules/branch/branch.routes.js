@@ -3,7 +3,13 @@ import { validate } from '../../common/middleware/validate.js'
 import { authenticate } from '../../common/middleware/authenticate.js'
 import { authorize } from '../../common/middleware/authorize.js'
 import { idParams } from '../../common/validation/common.js'
-import { branchListQuery, branchStatusBody, createBranchBody, updateBranchBody } from './branch.validation.js'
+import {
+  branchDetailQuery,
+  branchListQuery,
+  branchStatusBody,
+  createBranchBody,
+  updateBranchBody,
+} from './branch.validation.js'
 import * as branchController from './branch.controller.js'
 
 export const branchRouter = Router()
@@ -28,7 +34,7 @@ branchRouter.get(
   '/:id',
   authenticate,
   authorize('branch', 'read'),
-  validate({ params: idParams }),
+  validate({ params: idParams, query: branchDetailQuery }),
   branchController.getById,
 )
 

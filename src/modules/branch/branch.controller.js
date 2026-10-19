@@ -8,7 +8,7 @@ export const list = asyncHandler(async (req, res) => {
 })
 
 export const getById = asyncHandler(async (req, res) => {
-  const data = await branchService.getById(req.params.id, req.user)
+  const data = await branchService.getById(req.params.id, req.user, req.query)
   sendSuccess(res, { message: 'Branch fetched', data })
 })
 

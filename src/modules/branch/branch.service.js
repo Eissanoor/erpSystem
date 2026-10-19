@@ -6,6 +6,7 @@ import { pick } from '../../common/utils/pick.js'
 import { rethrowDuplicate } from '../../common/utils/duplicateKey.js'
 import { ORG_CACHE, clearOrgCache, isDropdownList, readDropdown } from '../../common/utils/masterListCache.js'
 import { attachBranchUsage, childLocations, organizationSummary } from '../location/register.js'
+import { BRANCH_TYPE_LABELS } from './branch.constants.js'
 import { Shop } from '../shop/shop.model.js'
 import { Warehouse } from '../warehouse/warehouse.model.js'
 import { Branch } from './branch.model.js'
@@ -91,13 +92,28 @@ async function loadBranch(id) {
   return assertFound(branch, 'Branch not found')
 }
 
-async function presentBranch(branch, user) {
+function pageLocations(locations, query = {}) {
+  const total = locations.length
+  if (!query.page && !query.limit) {
+    return { items: locations, meta: { page: 1, limit: total, total } }
+  }
+  const page = Math.max(1, Number(query.page) || 1)
+  const limit = Math.min(100, Math.max(1, Number(query.limit) || 20))
+  const start = (page - 1) * limit
+  return { items: locations.slice(start, start + limit), meta: { page, limit, total } }
+}
+
+async function presentBranch(branch, user, query) {
   const locations = await childLocations(branch._id, user)
+  const page = pageLocations(locations, query)
   return {
     ...branch,
+    branchTypeLabel: BRANCH_TYPE_LABELS[branch.branchType] || '',
+    summary: await organizationSummary(user),
     warehouseCount: locations.filter((row) => row.type === 'warehouse').length,
     shopCount: locations.filter((row) => row.type === 'shop').length,
-    locations,
+    locations: page.items,
+    locationsMeta: page.meta,
   }
 }
 
@@ -141,9 +157,9 @@ export async function list(query, user) {
   }
 }
 
-export async function getById(id, user) {
+export async function getById(id, user, query) {
   assertCanSee(id, user)
-  return presentBranch(await loadBranch(id), user)
+  return presentBranch(await loadBranch(id), user, query)
 }
 
 export async function create(body) {

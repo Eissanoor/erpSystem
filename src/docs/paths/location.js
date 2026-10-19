@@ -23,6 +23,8 @@ export function locationPaths({
   listLabel,
   duplicateMessage,
   workspace = false,
+  detailParameters = [],
+  detailDescription,
 }) {
   const item = { $ref: schema }
   const one = label || noun.toLowerCase()
@@ -73,8 +75,9 @@ export function locationPaths({
         tags: [tag],
         operationId: `get${noun}`,
         summary: `Get a ${one}`,
+        description: detailDescription,
         security: bearer,
-        parameters: idParam,
+        parameters: [...idParam, ...detailParameters],
         responses: {
           200: success(noun, item),
           401: error('Authentication required'),
