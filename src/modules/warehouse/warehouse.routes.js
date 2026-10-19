@@ -6,6 +6,7 @@ import { idParams, masterStatusBody } from '../../common/validation/common.js'
 import {
   createWarehouseBody,
   updateWarehouseBody,
+  warehouseDetailQuery,
   warehouseListQuery,
 } from './warehouse.validation.js'
 import * as warehouseController from './warehouse.controller.js'
@@ -32,7 +33,7 @@ warehouseRouter.get(
   '/:id',
   authenticate,
   authorize('warehouse', 'read'),
-  validate({ params: idParams }),
+  validate({ params: idParams, query: warehouseDetailQuery }),
   warehouseController.getById,
 )
 

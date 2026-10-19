@@ -27,6 +27,7 @@ export function locationPaths({
   listDescription,
   detailParameters = [],
   detailDescription,
+  updateDescription,
 }) {
   const item = { $ref: schema }
   const one = label || noun.toLowerCase()
@@ -93,6 +94,7 @@ export function locationPaths({
         tags: [tag],
         operationId: `update${noun}`,
         summary: `Update a ${one}`,
+        description: updateDescription,
         security: bearer,
         parameters: idParam,
         requestBody: {

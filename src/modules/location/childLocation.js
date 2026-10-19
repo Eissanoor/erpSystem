@@ -32,9 +32,9 @@ export function createChildLocationService({
     return assertFound(doc, notFound)
   }
 
-  async function present(doc, user) {
+  async function present(doc, user, query) {
     const branchId = doc.branchId?._id || doc.branchId
-    const extra = decorate ? await decorate(doc, user, branchId) : {}
+    const extra = decorate ? await decorate(doc, user, branchId, query) : {}
     return { ...doc, locations: await childLocations(branchId, user), ...extra }
   }
 
@@ -70,10 +70,10 @@ export function createChildLocationService({
       return { items: result.items, meta: { ...result.meta, summary: await summarize(user) } }
     },
 
-    async getById(id, user) {
+    async getById(id, user, query) {
       const filter = scopeToBranches({ _id: id }, user)
       const doc = await Model.findOne(filter).select(detailFields).populate(detailPopulate).lean()
-      return present(assertFound(doc, notFound), user)
+      return present(assertFound(doc, notFound), user, query)
     },
 
     async create(body, user) {

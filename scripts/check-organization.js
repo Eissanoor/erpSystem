@@ -7,6 +7,7 @@ import { cache } from '../src/common/utils/cache.js'
 import { Branch } from '../src/modules/branch/branch.model.js'
 import { Currency } from '../src/modules/currency/currency.model.js'
 import { Shop } from '../src/modules/shop/shop.model.js'
+import { Warehouse } from '../src/modules/warehouse/warehouse.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
 const LIMITED_PASSWORD = 'OrgLimited1'
@@ -119,11 +120,13 @@ try {
     name: 'Org Warehouse A',
     code: 'ORG-WA',
     branchId: branchA._id,
+    address: '1 Warehouse Road',
   })
   const warehouseB = await ensureChild(request, adminToken, 'warehouses', {
     name: 'Org Warehouse B',
     code: 'ORG-WB',
     branchId: branchB._id,
+    address: '2 Warehouse Road',
   })
   const shopA = await ensureChild(request, adminToken, 'shops', {
     name: 'Org Shop A',
@@ -154,9 +157,10 @@ try {
   )
   assert(!filtered.json.data.some((item) => item.code === 'ORG-WB'), 'branch A filter hides warehouse B')
   assert(filtered.json.data.every((item) => item.address === undefined), 'warehouse list omits address')
-  assert(filtered.json.meta.summary?.warehouses?.total >= 2, 'warehouse page summary counts warehouses')
-  assert(filtered.json.meta.summary.branches.total >= 2, 'warehouse page summary counts branches')
-  assert(filtered.json.meta.summary.shops.branchCount >= 1, 'warehouse page summary counts shop branches')
+  assert(filtered.json.meta.summary?.warehouses?.total >= 2, 'warehouse cards count warehouses')
+  assert(filtered.json.meta.summary.warehouses.active >= 1, 'warehouse cards count active warehouses')
+  assert(filtered.json.meta.summary.storageZones === 0, 'storage zones are empty until zones exist')
+  assert(filtered.json.meta.summary.custodians === 0, 'custodians are empty until employees exist')
   const warehouseRow = filtered.json.data.find((item) => item.code === 'ORG-WA')
   assert(!warehouseRow?.location, 'warehouse register includes location')
   assert(warehouseRow.managerId == null, 'warehouse register manager is unassigned')
@@ -166,6 +170,158 @@ try {
   assertStatus(warehousePage, 200, 'warehouse page detail')
   assert(typeof warehousePage.json.data.address === 'string', 'warehouse detail keeps the operating address')
   assert(warehousePage.json.data.branchId?.code === 'ORG-A', 'warehouse detail includes the parent branch')
+  assert(Array.isArray(warehousePage.json.data.zones) && warehousePage.json.data.zones.length === 0, 'zones table is empty')
+  assert(warehousePage.json.data.zonesMeta?.total === 0, 'zones table total is zero')
+  assert(warehousePage.json.data.summary?.warehouses?.total >= 1, 'warehouse view includes the cards')
+  assert(warehousePage.json.data.summary.warehouses.active >= 1, 'warehouse view counts active warehouses')
+  assert(warehousePage.json.data.summary.storageZones === 0, 'warehouse view storage zones follow stored zones')
+  assert(warehousePage.json.data.summary.custodians === 0, 'warehouse view custodians are empty until employees exist')
+  assert(warehousePage.json.data.managerId == null, 'warehouse custodian is empty until employees exist')
+  assert(typeof warehousePage.json.data.createdAt === 'string', 'created on is createdAt')
+  assert(typeof warehousePage.json.data.updatedAt === 'string', 'updated is updatedAt')
+  const zoned = await request('GET', `/api/v1/warehouses/${warehouseA._id}?page=1&limit=2`, { token: adminToken })
+  assertStatus(zoned, 200, 'paged zones')
+  assert(zoned.json.data.zonesMeta?.page === 1 && zoned.json.data.zonesMeta?.limit === 2, 'zones table accepts page and limit')
+
+  const warehouseCode = `wh-${Date.now().toString(36)}`
+  const addedWarehouse = await request('POST', '/api/v1/warehouses', {
+    token: adminToken,
+    body: {
+      name: 'Main Warehouse',
+      code: warehouseCode,
+      branchId: branchA._id,
+      warehouseType: 'finished_goods',
+      address: '18 Commerce Avenue',
+      phone: '+1 202 555 0148',
+      floorArea: 'Ground floor',
+      storageCapacity: '40000 kg',
+      managerId: null,
+      stockAccount: 'Stock-CEN',
+      defaultZone: 'Zone A',
+      binTracking: 'Enabled',
+      negativeStock: 'Not allowed',
+      status: 'active',
+      document: {
+        type: 'Warehouse layout / lease',
+        reference: 'LEASE-001',
+        fileName: 'warehouse-layout.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(addedWarehouse, 201, 'add warehouse form')
+  assert(addedWarehouse.json.data.warehouseType === 'finished_goods', 'warehouse type is stored')
+  assert(addedWarehouse.json.data.warehouseTypeLabel === 'Finished goods', 'warehouse type label is returned')
+  assert(addedWarehouse.json.data.address === '18 Commerce Avenue', 'warehouse address is stored')
+  assert(addedWarehouse.json.data.phone === '+1 202 555 0148', 'warehouse phone is stored')
+  assert(addedWarehouse.json.data.floorArea === 'Ground floor', 'floor area is stored')
+  assert(addedWarehouse.json.data.storageCapacity === '40000 kg', 'storage capacity is stored')
+  assert(addedWarehouse.json.data.stockAccount === 'Stock-CEN', 'default stock account is stored')
+  assert(addedWarehouse.json.data.defaultZone === 'Zone A', 'default zone is stored')
+  assert(addedWarehouse.json.data.binTracking === 'Enabled', 'bin tracking is stored')
+  assert(addedWarehouse.json.data.negativeStock === 'Not allowed', 'negative stock is stored')
+  assert(addedWarehouse.json.data.document?.type === 'Warehouse layout / lease', 'warehouse document type is stored')
+  assert(addedWarehouse.json.data.document?.fileName === 'warehouse-layout.pdf', 'warehouse document file name is stored')
+  assert(addedWarehouse.json.data.notes === 'Add remarks for authorized workspace administrators', 'warehouse notes are stored')
+  assert(addedWarehouse.json.data.managerId === null, 'custodian stays empty until employees exist')
+  assert(addedWarehouse.json.data.code === warehouseCode.toUpperCase(), 'warehouse code is stored uppercase')
+  assert(addedWarehouse.json.data.zonesMeta?.total === 0, 'new warehouse has no zones')
+
+  await Warehouse.updateOne(
+    { _id: addedWarehouse.json.data._id },
+    {
+      $set: {
+        zones: [
+          {
+            code: 'ZN-A',
+            name: 'Zone A / A-01',
+            use: 'finished_goods',
+            capacity: '40000',
+            unit: 'kg',
+            status: 'active',
+          },
+        ],
+      },
+    },
+  )
+  const shopBeforeWarehouseEdit = await request('GET', `/api/v1/shops/${shopA._id}`, { token: adminToken })
+  const editedWarehouse = await request('PATCH', `/api/v1/warehouses/${addedWarehouse.json.data._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Main Warehouse',
+      code: warehouseCode,
+      branchId: branchA._id,
+      warehouseType: 'finished_goods',
+      address: 'Warehouse Road, City Center',
+      phone: '',
+      floorArea: '2,400 sq ft',
+      storageCapacity: '120,000 kg',
+      managerId: null,
+      stockAccount: 'Inventory — finished goods',
+      defaultZone: 'Zone A',
+      binTracking: 'Enabled',
+      negativeStock: 'Blocked',
+      status: 'active',
+      document: {
+        type: 'Warehouse layout / lease',
+        reference: 'DOC-2026-001',
+        fileName: 'agreement-or-record.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(editedWarehouse, 200, 'edit warehouse')
+  assert(editedWarehouse.json.data.warehouseTypeLabel === 'Finished goods', 'edit returns the warehouse type label')
+  assert(editedWarehouse.json.data.address === 'Warehouse Road, City Center', 'edit stores the warehouse address')
+  assert(editedWarehouse.json.data.phone === '', 'edit stores an empty phone')
+  assert(editedWarehouse.json.data.floorArea === '2,400 sq ft', 'edit stores the floor area')
+  assert(editedWarehouse.json.data.storageCapacity === '120,000 kg', 'edit stores the storage capacity')
+  assert(editedWarehouse.json.data.stockAccount === 'Inventory — finished goods', 'edit stores the stock account')
+  assert(editedWarehouse.json.data.defaultZone === 'Zone A', 'edit stores the default zone')
+  assert(editedWarehouse.json.data.binTracking === 'Enabled', 'edit stores bin tracking')
+  assert(editedWarehouse.json.data.negativeStock === 'Blocked', 'edit stores negative stock')
+  assert(editedWarehouse.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
+  assert(editedWarehouse.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
+  assert(editedWarehouse.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the warehouse notes')
+  assert(editedWarehouse.json.data.managerId === null, 'edit leaves the custodian empty')
+  assert(editedWarehouse.json.data.code === warehouseCode.toUpperCase(), 'edit stores the code uppercase')
+  assert(parentId(editedWarehouse.json.data.branchId) === String(branchA._id), 'edit keeps the parent branch')
+  assert(editedWarehouse.json.data.zones[0]?.code === 'ZN-A', 'edit keeps the zone')
+  assert(editedWarehouse.json.data.zones[0]?.useLabel === 'Finished goods', 'edit returns the zone use')
+  const keptDocument = await request('PATCH', `/api/v1/warehouses/${addedWarehouse.json.data._id}`, {
+    token: adminToken,
+    body: { name: 'Main Warehouse' },
+  })
+  assertStatus(keptDocument, 200, 'edit without a new file')
+  assert(keptDocument.json.data.document?.reference === 'DOC-2026-001', 'existing document reference stays')
+  assert(keptDocument.json.data.document?.fileName === 'agreement-or-record.pdf', 'existing document file stays')
+  assert(keptDocument.json.data.zones[0]?.code === 'ZN-A', 'zone stays after a later edit')
+  const shopAfterWarehouseEdit = await request('GET', `/api/v1/shops/${shopA._id}`, { token: adminToken })
+  assert(shopAfterWarehouseEdit.json.data.name === shopBeforeWarehouseEdit.json.data.name, 'warehouse edit leaves the shop name')
+  assert(shopAfterWarehouseEdit.json.data.code === shopBeforeWarehouseEdit.json.data.code, 'warehouse edit leaves the shop code')
+  const badWarehouseEditFile = await request('PATCH', `/api/v1/warehouses/${addedWarehouse.json.data._id}`, {
+    token: adminToken,
+    body: { document: { fileName: 'notes.txt' } },
+  })
+  assertStatus(badWarehouseEditFile, 400, 'edit warehouse rejects a file that is not pdf or image')
+  await Warehouse.deleteOne({ _id: addedWarehouse.json.data._id })
+
+  const missingAddress = await request('POST', '/api/v1/warehouses', {
+    token: adminToken,
+    body: { name: 'No Address', code: 'NO-WH-ADDR', branchId: branchA._id },
+  })
+  assertStatus(missingAddress, 400, 'warehouse address is required')
+  const badWarehouseFile = await request('POST', '/api/v1/warehouses', {
+    token: adminToken,
+    body: {
+      name: 'Bad File',
+      code: 'BAD-WH-FILE',
+      branchId: branchA._id,
+      address: '1 Road',
+      document: { fileName: 'notes.txt' },
+    },
+  })
+  assertStatus(badWarehouseFile, 400, 'warehouse file must be pdf or image')
   assert(
     warehousePage.json.data.locations.some((row) => row.type === 'warehouse' && row.code === 'ORG-WA'),
     'location hierarchy includes the warehouse',
@@ -404,7 +560,7 @@ try {
 
   const onInactive = await request('POST', '/api/v1/warehouses', {
     token: adminToken,
-    body: { name: 'Blocked Warehouse', code: 'ORG-BLOCK', branchId: branchB._id },
+    body: { name: 'Blocked Warehouse', code: 'ORG-BLOCK', branchId: branchB._id, address: '1 Road' },
   })
   assertStatus(onInactive, 400, 'warehouse on an inactive branch')
   assert(onInactive.json.errors?.[0]?.field === 'branchId', 'inactive branch error points at branchId')
@@ -420,7 +576,7 @@ try {
 
   const unknownWarehouse = await request('POST', '/api/v1/warehouses', {
     token: adminToken,
-    body: { name: 'Missing Branch', code: 'ORG-MISS', branchId: MISSING_ID },
+    body: { name: 'Missing Branch', code: 'ORG-MISS', branchId: MISSING_ID, address: '1 Road' },
   })
   assertStatus(unknownWarehouse, 400, 'unknown branch on warehouse')
   assert(unknownWarehouse.json.errors?.[0]?.field === 'branchId', 'unknown branch field')
@@ -556,7 +712,7 @@ try {
 
   const foreignWarehouse = await request('POST', '/api/v1/warehouses', {
     token: limitedToken,
-    body: { name: 'Foreign Warehouse', code: 'ORG-FOREIGN', branchId: branchB._id },
+    body: { name: 'Foreign Warehouse', code: 'ORG-FOREIGN', branchId: branchB._id, address: '1 Road' },
   })
   assertStatus(foreignWarehouse, 403, 'create warehouse on branch B')
 

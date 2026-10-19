@@ -60,6 +60,24 @@ export async function shopRegisterSummary(user) {
   }
 }
 
+export async function warehouseRegisterSummary(user) {
+  const filter = scopeToBranches({}, user)
+  const [total, active, custodians, zoneRows] = await Promise.all([
+    Warehouse.countDocuments(filter),
+    Warehouse.countDocuments({ ...filter, status: 'active' }),
+    Warehouse.distinct('managerId', { ...filter, managerId: { $ne: null } }),
+    Warehouse.aggregate([
+      { $match: filter },
+      { $group: { _id: null, total: { $sum: { $size: { $ifNull: ['$zones', []] } } } } },
+    ]),
+  ])
+  return {
+    warehouses: { total, active },
+    storageZones: zoneRows[0]?.total || 0,
+    custodians: custodians.length,
+  }
+}
+
 export async function childLocations(branchId, user) {
   const filter = user ? scopeToBranches({ branchId }, user) : { branchId }
   const [warehouses, shops] = await Promise.all([
