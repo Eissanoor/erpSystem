@@ -46,6 +46,20 @@ export async function attachBranchUsage(branches) {
   }))
 }
 
+export async function shopRegisterSummary(user) {
+  const filter = scopeToBranches({}, user)
+  const [total, active, branchIds] = await Promise.all([
+    Shop.countDocuments(filter),
+    Shop.countDocuments({ ...filter, status: 'active' }),
+    Shop.distinct('branchId', filter),
+  ])
+  return {
+    shops: { total, active },
+    branches: branchIds.length,
+    assignedStaff: 0,
+  }
+}
+
 export async function childLocations(branchId, user) {
   const filter = user ? scopeToBranches({ branchId }, user) : { branchId }
   const [warehouses, shops] = await Promise.all([

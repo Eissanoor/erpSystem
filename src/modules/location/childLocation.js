@@ -15,15 +15,27 @@ const WRITE_FIELDS = ['branchId', 'name', 'code', 'location', 'address', 'manage
 const POPULATE = { path: 'branchId', select: 'name code location' }
 const DETAIL_POPULATE = { path: 'branchId', select: 'name code phone location address' }
 
-export function createChildLocationService({ Model, cachePrefix, notFound, duplicateMessage }) {
+export function createChildLocationService({
+  Model,
+  cachePrefix,
+  notFound,
+  duplicateMessage,
+  summarize = organizationSummary,
+  detailFields = DETAIL_FIELDS,
+  detailPopulate = DETAIL_POPULATE,
+  writeFields = WRITE_FIELDS,
+  link,
+  decorate,
+}) {
   async function load(id) {
-    const doc = await Model.findById(id).select(DETAIL_FIELDS).populate(DETAIL_POPULATE).lean()
+    const doc = await Model.findById(id).select(detailFields).populate(detailPopulate).lean()
     return assertFound(doc, notFound)
   }
 
   async function present(doc, user) {
     const branchId = doc.branchId?._id || doc.branchId
-    return { ...doc, locations: await childLocations(branchId, user) }
+    const extra = decorate ? await decorate(doc, user, branchId) : {}
+    return { ...doc, locations: await childLocations(branchId, user), ...extra }
   }
 
   async function findInScope(id, user) {
@@ -55,19 +67,21 @@ export function createChildLocationService({ Model, cachePrefix, notFound, dupli
 
       // Dropdown selects stay slim. The register carries the card counts.
       if (isDropdownList(query)) return result
-      return { items: result.items, meta: { ...result.meta, summary: await organizationSummary(user) } }
+      return { items: result.items, meta: { ...result.meta, summary: await summarize(user) } }
     },
 
     async getById(id, user) {
       const filter = scopeToBranches({ _id: id }, user)
-      const doc = await Model.findOne(filter).select(DETAIL_FIELDS).populate(DETAIL_POPULATE).lean()
+      const doc = await Model.findOne(filter).select(detailFields).populate(detailPopulate).lean()
       return present(assertFound(doc, notFound), user)
     },
 
     async create(body, user) {
       await assertAssignableBranch(body.branchId, user)
+      const extra = link ? await link(body, body.branchId, {}) : {}
       try {
         const doc = await Model.create({
+          ...pick(body, writeFields),
           branchId: body.branchId,
           name: body.name,
           code: body.code,
@@ -75,6 +89,7 @@ export function createChildLocationService({ Model, cachePrefix, notFound, dupli
           address: body.address || '',
           managerId: null,
           status: body.status || 'active',
+          ...extra,
         })
         clearOrgCache(cachePrefix)
         return present(await load(doc._id), user)
@@ -88,7 +103,11 @@ export function createChildLocationService({ Model, cachePrefix, notFound, dupli
       if (body.branchId && String(body.branchId) !== String(doc.branchId)) {
         await assertAssignableBranch(body.branchId, user)
       }
-      doc.set(pick(body, WRITE_FIELDS))
+      const branchId = body.branchId || doc.branchId
+      const extra = link ? await link(body, branchId, doc) : {}
+      doc.set(pick(body, writeFields))
+      if (extra.warehouseId !== undefined) doc.warehouseId = extra.warehouseId
+      if (extra.document) doc.document = extra.document
       try {
         await doc.save()
       } catch (error) {

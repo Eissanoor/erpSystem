@@ -23,6 +23,8 @@ export function locationPaths({
   listLabel,
   duplicateMessage,
   workspace = false,
+  listMeta,
+  listDescription,
   detailParameters = [],
   detailDescription,
 }) {
@@ -38,15 +40,17 @@ export function locationPaths({
         tags: [tag],
         operationId: `list${plural}`,
         summary: `List ${many}`,
-        description: workspace
-          ? 'Register lists include meta.summary for the organization cards. The active dropdown (status=active, page=1, limit=20, no search or sort) omits summary and, for branches, the shop and warehouse counts.'
-          : undefined,
+        description:
+          listDescription ||
+          (workspace
+            ? 'Register lists include meta.summary for the organization cards. The active dropdown (status=active, page=1, limit=20, no search or sort) omits summary and, for branches, the shop and warehouse counts.'
+            : undefined),
         security: bearer,
         parameters: listParameters,
         responses: {
           200: success(plural, { type: 'array', items: item }, {
             list: true,
-            meta: workspace ? { $ref: '#/components/schemas/OrganizationPageMeta' } : undefined,
+            meta: listMeta || (workspace ? { $ref: '#/components/schemas/OrganizationPageMeta' } : undefined),
           }),
           401: error('Authentication required'),
           403: error(`Missing ${permission}.read`),

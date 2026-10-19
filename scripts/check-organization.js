@@ -6,6 +6,7 @@ import { seedAuth } from '../src/seed/seedAuth.js'
 import { cache } from '../src/common/utils/cache.js'
 import { Branch } from '../src/modules/branch/branch.model.js'
 import { Currency } from '../src/modules/currency/currency.model.js'
+import { Shop } from '../src/modules/shop/shop.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
 const LIMITED_PASSWORD = 'OrgLimited1'
@@ -67,14 +68,14 @@ async function ensureBranch(request, token, { name, code }) {
   return updated.json.data
 }
 
-async function ensureChild(request, token, resource, { name, code, branchId }) {
+async function ensureChild(request, token, resource, { name, code, branchId, ...extra }) {
   const listed = await request('GET', `/api/v1/${resource}?search=${encodeURIComponent(code)}&limit=20`, { token })
   assertStatus(listed, 200, `search ${resource} ${code}`)
   const found = listed.json.data.find((item) => item.code === code)
   if (!found) {
     const created = await request('POST', `/api/v1/${resource}`, {
       token,
-      body: { name, code, branchId, status: 'active' },
+      body: { name, code, branchId, status: 'active', ...extra },
     })
     assertStatus(created, 201, `create ${resource} ${code}`)
     return created.json.data
@@ -128,11 +129,15 @@ try {
     name: 'Org Shop A',
     code: 'ORG-SA',
     branchId: branchA._id,
+    shopType: 'retail',
+    address: '1 Shop Road',
   })
   await ensureChild(request, adminToken, 'shops', {
     name: 'Org Shop B',
     code: 'ORG-SB',
     branchId: branchB._id,
+    shopType: 'outlet',
+    address: '2 Shop Road',
   })
 
   assert(warehouseA.address === undefined || typeof warehouseA.address === 'string', 'warehouse detail has address')
@@ -155,7 +160,7 @@ try {
   const warehouseRow = filtered.json.data.find((item) => item.code === 'ORG-WA')
   assert(!warehouseRow?.location, 'warehouse register includes location')
   assert(warehouseRow.managerId == null, 'warehouse register manager is unassigned')
-  assert(!warehouseRow.branchId?.location, 'warehouse register includes the branch area')
+  assert(warehouseRow.branchId?.code === 'ORG-A', 'warehouse register includes the branch')
 
   const warehousePage = await request('GET', `/api/v1/warehouses/${warehouseA._id}`, { token: adminToken })
   assertStatus(warehousePage, 200, 'warehouse page detail')
@@ -189,6 +194,147 @@ try {
     branchPage.json.data.locations[0]?.type === 'warehouse',
     'branch hierarchy lists warehouses before shops',
   )
+
+  const shopRegister = await request('GET', '/api/v1/shops?limit=100', { token: adminToken })
+  assertStatus(shopRegister, 200, 'shop register')
+  assert(shopRegister.json.meta.summary?.shops?.total >= 2, 'shop cards count shops')
+  assert(shopRegister.json.meta.summary.shops.active >= 1, 'shop cards count active shops')
+  assert(shopRegister.json.meta.summary.branches >= 1, 'shop cards count branches that have shops')
+  assert(shopRegister.json.meta.summary.assignedStaff === 0, 'assigned staff is empty until employees exist')
+  const shopRow = shopRegister.json.data.find((item) => item.code === 'ORG-SA')
+  assert(shopRow?.name === 'Org Shop A', 'shop register includes the shop name')
+  assert(shopRow.branchId?.name === 'Org Branch A', 'shop register includes the branch')
+  assert(shopRow.managerId == null, 'shop manager is empty until employees exist')
+  assert(shopRow.address === undefined, 'shop register omits the address')
+
+  const shopCode = `shop-${Date.now().toString(36)}`
+  const addedShop = await request('POST', '/api/v1/shops', {
+    token: adminToken,
+    body: {
+      name: 'Central Shop',
+      code: shopCode,
+      branchId: branchA._id,
+      shopType: 'retail',
+      address: '18 Commerce Avenue',
+      location: 'City Center',
+      phone: '+1 202 555 0148',
+      email: 'Shop@Example.com',
+      warehouseId: warehouseA._id,
+      priceList: 'Retail',
+      cashAccount: 'Cash-CEN',
+      openingHours: '09:00-21:00',
+      status: 'active',
+      managerId: null,
+      document: {
+        type: 'Shop lease / registration',
+        reference: 'LEASE-001',
+        fileName: 'shop-lease.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(addedShop, 201, 'add shop form')
+  assert(addedShop.json.data.shopType === 'retail', 'shop type is stored')
+  assert(addedShop.json.data.shopTypeLabel === 'Retail outlet', 'shop type label is returned')
+  assert(addedShop.json.data.summary?.shops?.total >= 1, 'shop view includes the cards')
+  assert(addedShop.json.data.summary.assignedStaff === 0, 'shop view assigned staff is empty')
+  assert(addedShop.json.data.employeesMeta?.total === 0, 'assigned employees table is empty')
+  assert(addedShop.json.data.address === '18 Commerce Avenue', 'shop address is stored')
+  assert(addedShop.json.data.location === 'City Center', 'shop city is stored')
+  assert(addedShop.json.data.email === 'shop@example.com', 'shop email is stored lowercase')
+  assert(addedShop.json.data.priceList === 'Retail', 'price list is stored')
+  assert(addedShop.json.data.cashAccount === 'Cash-CEN', 'cash account is stored')
+  assert(addedShop.json.data.openingHours === '09:00-21:00', 'opening hours are stored')
+  assert(addedShop.json.data.document?.type === 'Shop lease / registration', 'shop document type is stored')
+  assert(addedShop.json.data.document?.fileName === 'shop-lease.pdf', 'shop document file name is stored')
+  assert(addedShop.json.data.managerId === null, 'shop manager stays empty until employees exist')
+  assert(parentId(addedShop.json.data.warehouseId) === String(warehouseA._id), 'add shop links a warehouse in the branch')
+  assert(addedShop.json.data.code === shopCode.toUpperCase(), 'shop code is stored uppercase')
+
+  const missingShopType = await request('POST', '/api/v1/shops', {
+    token: adminToken,
+    body: { name: 'No Type', code: 'NO-SHOP-TYPE', branchId: branchA._id, address: '1 Road' },
+  })
+  assertStatus(missingShopType, 400, 'shop type is required')
+
+  const shopWrongWarehouse = await request('POST', '/api/v1/shops', {
+    token: adminToken,
+    body: {
+      name: 'Wrong Warehouse Shop',
+      code: `bad-shop-${Date.now().toString(36)}`,
+      branchId: branchA._id,
+      shopType: 'outlet',
+      address: '1 Road',
+      warehouseId: warehouseB._id,
+    },
+  })
+  assertStatus(shopWrongWarehouse, 400, 'add shop rejects a warehouse from another branch')
+  assert(shopWrongWarehouse.json.errors?.[0]?.field === 'warehouseId', 'add shop warehouse field')
+  await Shop.deleteOne({ _id: addedShop.json.data._id })
+
+  const linkedShop = await request('PATCH', `/api/v1/shops/${shopA._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Org Shop A',
+      code: 'ORG-SA',
+      branchId: branchA._id,
+      shopType: 'retail',
+      address: '18 Commerce Avenue',
+      location: 'City Center',
+      phone: '',
+      email: 'shop@example.com',
+      managerId: null,
+      warehouseId: warehouseA._id,
+      priceList: 'Standard retail',
+      cashAccount: 'Central shop cash',
+      openingHours: '09:00-18:00',
+      status: 'active',
+      document: {
+        type: 'Shop lease / registration',
+        reference: 'DOC-2026-001',
+        fileName: 'agreement-or-record.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(linkedShop, 200, 'edit shop')
+  assert(linkedShop.json.data.shopTypeLabel === 'Retail outlet', 'edit returns the shop type label')
+  assert(linkedShop.json.data.address === '18 Commerce Avenue', 'edit stores the shop address')
+  assert(linkedShop.json.data.location === 'City Center', 'edit stores the shop city')
+  assert(linkedShop.json.data.email === 'shop@example.com', 'edit stores the shop email')
+  assert(linkedShop.json.data.priceList === 'Standard retail', 'edit stores the price list')
+  assert(linkedShop.json.data.cashAccount === 'Central shop cash', 'edit stores the cash account')
+  assert(linkedShop.json.data.openingHours === '09:00-18:00', 'edit stores the opening hours')
+  assert(linkedShop.json.data.document?.reference === 'DOC-2026-001', 'edit stores the shop document reference')
+  assert(linkedShop.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the shop file name')
+  assert(linkedShop.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the shop notes')
+  assert(parentId(linkedShop.json.data.branchId) === String(branchA._id), 'edit keeps the parent branch')
+  assert(parentId(linkedShop.json.data.warehouseId) === String(warehouseA._id), 'shop stores its linked warehouse')
+  assert(linkedShop.json.data.warehouseId?.code === 'ORG-WA', 'linked warehouse includes its code')
+  assert(
+    linkedShop.json.data.warehouses.some((row) => row.code === 'ORG-WA'),
+    'shop detail lists warehouses in its branch',
+  )
+  assert(
+    !linkedShop.json.data.warehouses.some((row) => row.code === 'ORG-WB'),
+    'shop detail hides warehouses from other branches',
+  )
+  assert(Array.isArray(linkedShop.json.data.employees) && linkedShop.json.data.employees.length === 0, 'assigned employees are empty')
+
+  const foreignShopWarehouse = await request('PATCH', `/api/v1/shops/${shopA._id}`, {
+    token: adminToken,
+    body: { warehouseId: warehouseB._id },
+  })
+  assertStatus(foreignShopWarehouse, 400, 'shop rejects a warehouse from another branch')
+  assert(foreignShopWarehouse.json.errors?.[0]?.field === 'warehouseId', 'foreign shop warehouse field')
+  const warehouseAfterShopEdit = await request('GET', `/api/v1/warehouses/${warehouseA._id}`, { token: adminToken })
+  assertStatus(warehouseAfterShopEdit, 200, 'warehouse remains after shop edit')
+  assert(warehouseAfterShopEdit.json.data.name === 'Org Warehouse A', 'shop edit leaves the warehouse record as it was')
+  const badShopFile = await request('PATCH', `/api/v1/shops/${shopA._id}`, {
+    token: adminToken,
+    body: { document: { fileName: 'notes.txt' } },
+  })
+  assertStatus(badShopFile, 400, 'edit shop rejects a file that is not pdf or image')
 
   const edited = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
     token: adminToken,
@@ -281,7 +427,7 @@ try {
 
   const unknownShop = await request('POST', '/api/v1/shops', {
     token: adminToken,
-    body: { name: 'Missing Shop Branch', code: 'ORG-SMISS', branchId: MISSING_ID },
+    body: { name: 'Missing Shop Branch', code: 'ORG-SMISS', branchId: MISSING_ID, shopType: 'retail', address: '1 Road' },
   })
   assertStatus(unknownShop, 400, 'unknown branch on shop')
 
