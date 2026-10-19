@@ -54,7 +54,7 @@ async function ensureBranch(request, token, { name, code }) {
   if (!found) {
     const created = await request('POST', '/api/v1/branches', {
       token,
-      body: { name, code, status: 'active' },
+      body: { name, code, branchType: 'retail', address: '1 Test Road', status: 'active' },
     })
     assertStatus(created, 201, `create branch ${code}`)
     return created.json.data
@@ -353,10 +353,62 @@ try {
   })
   assertStatus(foreignWarehouse, 403, 'create warehouse on branch B')
 
+  const formCode = `form-${Date.now().toString(36)}`
+  const formBranch = await request('POST', '/api/v1/branches', {
+    token: adminToken,
+    body: {
+      name: 'Central Branch',
+      code: formCode,
+      branchType: 'head_office',
+      openingDate: '2026-01-01',
+      address: '18 Commerce Avenue',
+      location: 'City Center',
+      phone: '+1 202 555 0148',
+      email: 'Central@Gulzar.local',
+      costCentre: 'CC-CEN',
+      documentPrefix: 'cen',
+      status: 'active',
+      managerId: null,
+      document: { type: 'Registration / lease', reference: 'REG-10012' },
+      notes: 'Authorized workspace note',
+    },
+  })
+  assertStatus(formBranch, 201, 'add branch form')
+  assert(formBranch.json.data.branchType === 'head_office', 'branch type is stored')
+  assert(formBranch.json.data.location === 'City Center', 'city is stored on location')
+  assert(formBranch.json.data.address === '18 Commerce Avenue', 'operating address is stored')
+  assert(formBranch.json.data.email === 'central@gulzar.local', 'branch email is stored lowercase')
+  assert(formBranch.json.data.documentPrefix === 'CEN', 'document prefix is stored uppercase')
+  assert(formBranch.json.data.document?.type === 'Registration / lease', 'document type is stored')
+  assert(formBranch.json.data.document?.reference === 'REG-10012', 'document reference is stored')
+  assert(formBranch.json.data.notes === 'Authorized workspace note', 'internal notes are stored')
+  assert(formBranch.json.data.managerId === null, 'manager stays empty until employees exist')
+  assert(formBranch.json.data.defaultWarehouseId === null, 'new branch has no default warehouse')
+
+  const missingType = await request('POST', '/api/v1/branches', {
+    token: adminToken,
+    body: { name: 'No Type', code: 'NO-TYPE', address: '1 Road' },
+  })
+  assertStatus(missingType, 400, 'branch type is required')
+
+  const foreignDefault = await request('POST', '/api/v1/branches', {
+    token: adminToken,
+    body: {
+      name: 'Default Miss',
+      code: `def-${Date.now().toString(36)}`,
+      branchType: 'retail',
+      address: '1 Road',
+      defaultWarehouseId: warehouseA._id,
+    },
+  })
+  assertStatus(foreignDefault, 400, 'default warehouse must belong to the new branch')
+  assert(foreignDefault.json.errors?.[0]?.field === 'defaultWarehouseId', 'default warehouse field')
+  await Branch.deleteOne({ _id: formBranch.json.data._id })
+
   const codeInput = `cache-${Date.now().toString(36)}`
   const cacheBranch = await request('POST', '/api/v1/branches', {
     token: adminToken,
-    body: { name: 'Cache Branch', code: codeInput, status: 'active' },
+    body: { name: 'Cache Branch', code: codeInput, branchType: 'regional', address: '1 Cache Road', status: 'active' },
   })
   assertStatus(cacheBranch, 201, 'create cache branch')
   assert(cacheBranch.json.data.code === codeInput.toUpperCase(), 'branch code is stored uppercase')
