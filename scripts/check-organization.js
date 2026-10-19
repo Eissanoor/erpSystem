@@ -149,6 +149,46 @@ try {
   )
   assert(!filtered.json.data.some((item) => item.code === 'ORG-WB'), 'branch A filter hides warehouse B')
   assert(filtered.json.data.every((item) => item.address === undefined), 'warehouse list omits address')
+  assert(filtered.json.meta.summary?.warehouses?.total >= 2, 'warehouse page summary counts warehouses')
+  assert(filtered.json.meta.summary.branches.total >= 2, 'warehouse page summary counts branches')
+  assert(filtered.json.meta.summary.shops.branchCount >= 1, 'warehouse page summary counts shop branches')
+  const warehouseRow = filtered.json.data.find((item) => item.code === 'ORG-WA')
+  assert(!warehouseRow?.location, 'warehouse register includes location')
+  assert(warehouseRow.managerId == null, 'warehouse register manager is unassigned')
+  assert(!warehouseRow.branchId?.location, 'warehouse register includes the branch area')
+
+  const warehousePage = await request('GET', `/api/v1/warehouses/${warehouseA._id}`, { token: adminToken })
+  assertStatus(warehousePage, 200, 'warehouse page detail')
+  assert(typeof warehousePage.json.data.address === 'string', 'warehouse detail keeps the operating address')
+  assert(warehousePage.json.data.branchId?.code === 'ORG-A', 'warehouse detail includes the parent branch')
+  assert(
+    warehousePage.json.data.locations.some((row) => row.type === 'warehouse' && row.code === 'ORG-WA'),
+    'location hierarchy includes the warehouse',
+  )
+  assert(
+    warehousePage.json.data.locations.some((row) => row.type === 'shop' && row.code === 'ORG-SA'),
+    'location hierarchy includes the shop',
+  )
+  assert(
+    !warehousePage.json.data.locations.some((row) => row.code === 'ORG-WB' || row.code === 'ORG-SB'),
+    'location hierarchy stays inside the warehouse branch',
+  )
+
+  const branchPage = await request('GET', `/api/v1/branches/${branchA._id}`, { token: adminToken })
+  assertStatus(branchPage, 200, 'branch page detail')
+  assert(branchPage.json.data.warehouseCount >= 1, 'branch detail counts warehouses')
+  assert(branchPage.json.data.shopCount >= 1, 'branch detail counts shops')
+  assert(
+    branchPage.json.data.locations[0]?.type === 'warehouse',
+    'branch hierarchy lists warehouses before shops',
+  )
+
+  const branchRegister = await request('GET', '/api/v1/branches?limit=100', { token: adminToken })
+  assertStatus(branchRegister, 200, 'branch register')
+  const branchRow = branchRegister.json.data.find((item) => item.code === 'ORG-A')
+  assert(branchRow?.warehouseCount >= 1 && branchRow.shopCount >= 1, 'branch register includes child counts')
+  assert(branchRow.address === undefined, 'branch register omits the operating address')
+  assert(branchRegister.json.meta.summary?.warehouses?.total >= 1, 'branch register includes the card summary')
 
   await setBranchStatus(request, adminToken, branchB._id, 'inactive')
   const warehouseBStill = await request('GET', `/api/v1/warehouses/${warehouseB._id}`, { token: adminToken })

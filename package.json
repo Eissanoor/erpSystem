@@ -9,6 +9,7 @@
     "check": "node scripts/check-foundation.js",
     "check:auth": "node scripts/check-auth.js",
     "check:org": "node scripts/check-organization.js",
+    "check:products": "node scripts/check-products.js",
     "seed": "node src/seed/run.js"
   },
   "dependencies": {

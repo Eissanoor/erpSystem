@@ -4,13 +4,14 @@ import { pagination } from '../../common/utils/pagination.js'
 import { listQuery } from '../../common/utils/listQuery.js'
 import { pick } from '../../common/utils/pick.js'
 import { rethrowDuplicate } from '../../common/utils/duplicateKey.js'
-import { ORG_CACHE, clearOrgCache, readDropdown } from '../../common/utils/masterListCache.js'
+import { ORG_CACHE, clearOrgCache, isDropdownList, readDropdown } from '../../common/utils/masterListCache.js'
+import { attachBranchUsage, childLocations, organizationSummary } from '../location/register.js'
 import { Branch } from './branch.model.js'
 
 const SORT_FIELDS = ['name', 'code', 'status', 'createdAt']
-const LIST_FIELDS = 'name code phone status createdAt updatedAt'
-const DETAIL_FIELDS = 'name code phone address managerId status createdAt updatedAt'
-const WRITE_FIELDS = ['name', 'code', 'phone', 'address', 'managerId', 'status']
+const LIST_FIELDS = 'name code phone location managerId status createdAt updatedAt'
+const DETAIL_FIELDS = 'name code phone location address managerId status createdAt updatedAt'
+const WRITE_FIELDS = ['name', 'code', 'phone', 'location', 'address', 'managerId', 'status']
 
 function hasAllBranches(user) {
   return Boolean(user?.permissionCodes?.includes('all_branches'))
@@ -43,6 +44,16 @@ async function loadBranch(id) {
   return assertFound(branch, 'Branch not found')
 }
 
+async function presentBranch(branch, user) {
+  const locations = await childLocations(branch._id, user)
+  return {
+    ...branch,
+    warehouseCount: locations.filter((row) => row.type === 'warehouse').length,
+    shopCount: locations.filter((row) => row.type === 'shop').length,
+    locations,
+  }
+}
+
 export async function assertAssignableBranch(branchId, user) {
   const branch = await Branch.findById(branchId).select('_id status').lean()
   if (!branch) {
@@ -65,20 +76,27 @@ export async function assertAssignableBranch(branchId, user) {
 
 export async function list(query, user) {
   const page = pagination(query, SORT_FIELDS)
-  const filter = scopeBranchDocs(listQuery(query, { searchFields: ['name', 'code'] }), user)
+  const filter = scopeBranchDocs(listQuery(query, { searchFields: ['name', 'code', 'location'] }), user)
 
-  return readDropdown(ORG_CACHE.branches, user, query, async () => {
+  const result = await readDropdown(ORG_CACHE.branches, user, query, async () => {
     const [items, total] = await Promise.all([
       Branch.find(filter).select(LIST_FIELDS).sort(page.sort).skip(page.skip).limit(page.limit).lean(),
       Branch.countDocuments(filter),
     ])
     return { items, meta: page.meta(total) }
   })
+
+  // Dropdown selects stay slim. The register (search, status, or another page size) carries counts.
+  if (isDropdownList(query)) return result
+  return {
+    items: await attachBranchUsage(result.items),
+    meta: { ...result.meta, summary: await organizationSummary(user) },
+  }
 }
 
 export async function getById(id, user) {
   assertCanSee(id, user)
-  return loadBranch(id)
+  return presentBranch(await loadBranch(id), user)
 }
 
 export async function create(body) {
@@ -87,12 +105,13 @@ export async function create(body) {
       name: body.name,
       code: body.code,
       phone: body.phone || '',
+      location: body.location || '',
       address: body.address || '',
       managerId: null,
       status: body.status || 'active',
     })
     clearLocationCache()
-    return loadBranch(branch._id)
+    return presentBranch(await loadBranch(branch._id))
   } catch (error) {
     rethrowDuplicate(error, 'code', 'Branch code already exists')
   }
@@ -108,7 +127,7 @@ export async function update(id, body, user) {
     rethrowDuplicate(error, 'code', 'Branch code already exists')
   }
   clearLocationCache()
-  return loadBranch(branch._id)
+  return presentBranch(await loadBranch(branch._id), user)
 }
 
 export async function setStatus(id, status, user) {
@@ -117,5 +136,5 @@ export async function setStatus(id, status, user) {
   branch.status = status
   await branch.save()
   clearLocationCache()
-  return loadBranch(branch._id)
+  return presentBranch(await loadBranch(branch._id), user)
 }

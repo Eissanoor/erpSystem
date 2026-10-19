@@ -9,6 +9,7 @@ export const warehousePaths = locationPaths({
   writeSchema: '#/components/schemas/WarehouseWrite',
   updateSchema: '#/components/schemas/WarehouseUpdate',
   permission: 'warehouse',
+  workspace: true,
   extraListParams: [branchIdQuery],
   statusDescription: 'Sets active or inactive. The parent branch is left unchanged.',
 })

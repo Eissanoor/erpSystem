@@ -19,8 +19,15 @@ export function locationPaths({
   permission,
   extraListParams = [],
   statusDescription,
+  label,
+  listLabel,
+  duplicateMessage,
+  workspace = false,
 }) {
   const item = { $ref: schema }
+  const one = label || noun.toLowerCase()
+  const many = listLabel || plural.toLowerCase()
+  const duplicate = duplicateMessage || `${noun} code already exists`
   const listParameters = [...listParams, statusParam(['active', 'inactive']), ...extraListParams]
 
   return {
@@ -28,11 +35,17 @@ export function locationPaths({
       get: {
         tags: [tag],
         operationId: `list${plural}`,
-        summary: `List ${plural.toLowerCase()}`,
+        summary: `List ${many}`,
+        description: workspace
+          ? 'Register lists include meta.summary for the organization cards. The active dropdown (status=active, page=1, limit=20, no search or sort) omits summary and, for branches, the shop and warehouse counts.'
+          : undefined,
         security: bearer,
         parameters: listParameters,
         responses: {
-          200: success(plural, { type: 'array', items: item }, { list: true }),
+          200: success(plural, { type: 'array', items: item }, {
+            list: true,
+            meta: workspace ? { $ref: '#/components/schemas/OrganizationPageMeta' } : undefined,
+          }),
           401: error('Authentication required'),
           403: error(`Missing ${permission}.read`),
         },
@@ -40,7 +53,7 @@ export function locationPaths({
       post: {
         tags: [tag],
         operationId: `create${noun}`,
-        summary: `Create a ${noun.toLowerCase()}`,
+        summary: `Create a ${one}`,
         security: bearer,
         requestBody: {
           required: true,
@@ -51,7 +64,7 @@ export function locationPaths({
           400: error('Validation failed'),
           401: error('Authentication required'),
           403: error(`Missing ${permission}.create`),
-          409: error(`${noun} code already exists`),
+          409: error(duplicate),
         },
       },
     },
@@ -59,7 +72,7 @@ export function locationPaths({
       get: {
         tags: [tag],
         operationId: `get${noun}`,
-        summary: `Get a ${noun.toLowerCase()}`,
+        summary: `Get a ${one}`,
         security: bearer,
         parameters: idParam,
         responses: {
@@ -72,7 +85,7 @@ export function locationPaths({
       patch: {
         tags: [tag],
         operationId: `update${noun}`,
-        summary: `Update a ${noun.toLowerCase()}`,
+        summary: `Update a ${one}`,
         security: bearer,
         parameters: idParam,
         requestBody: {
@@ -85,7 +98,7 @@ export function locationPaths({
           401: error('Authentication required'),
           403: error(`Missing ${permission}.update`),
           404: error(`${noun} not found`),
-          409: error(`${noun} code already exists`),
+          409: error(duplicate),
         },
       },
     },
@@ -93,7 +106,7 @@ export function locationPaths({
       patch: {
         tags: [tag],
         operationId: `update${noun}Status`,
-        summary: `Set ${noun.toLowerCase()} status`,
+        summary: `Set ${one} status`,
         description: statusDescription,
         security: bearer,
         parameters: idParam,

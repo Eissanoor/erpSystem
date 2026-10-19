@@ -6,6 +6,10 @@ import { shopPaths } from './paths/shops.js'
 import { userPaths } from './paths/users.js'
 import { warehousePaths } from './paths/warehouses.js'
 import { currencyPaths } from './paths/currencies.js'
+import { packingUnitPaths } from './paths/packingUnits.js'
+import { productCategoryPaths } from './paths/productCategories.js'
+import { productPaths } from './paths/products.js'
+import { quantityUnitPaths } from './paths/quantityUnits.js'
 
 const objectId = { type: 'string', pattern: '^[a-fA-F0-9]{24}$' }
 const objectIdArray = { type: 'array', items: objectId }
@@ -15,7 +19,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
     openapi: '3.0.3',
     info: {
       title: 'ERP Gulzar API',
-      version: '0.4.0',
+      version: '0.5.0',
       description:
         'Single-client ERP. Branch is the top-level location. Protected routes use bearerAuth. Logout does not revoke the access token before JWT_ACCESS_EXPIRES (default 15 minutes).',
     },
@@ -30,6 +34,10 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Warehouses', description: 'Inventory locations under a branch' },
       { name: 'Shops', description: 'Sales locations under a branch' },
       { name: 'Currencies', description: 'Global currency master' },
+      { name: 'Product categories', description: 'Product classification tree' },
+      { name: 'Quantity units', description: 'Base measurement units' },
+      { name: 'Packing units', description: 'Packs converted to a quantity unit' },
+      { name: 'Products', description: 'Product master, without stock quantities' },
     ],
     paths: {
       '/health': {
@@ -56,6 +64,10 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...warehousePaths,
       ...shopPaths,
       ...currencyPaths,
+      ...productCategoryPaths,
+      ...quantityUnitPaths,
+      ...packingUnitPaths,
+      ...productPaths,
     },
     components: {
       securitySchemes: {
@@ -114,6 +126,53 @@ export function buildOpenApiSpec(serverUrl = '/') {
             page: { type: 'integer' },
             limit: { type: 'integer' },
             total: { type: 'integer' },
+          },
+        },
+        OrganizationSummary: {
+          type: 'object',
+          properties: {
+            branches: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 4 },
+                active: { type: 'integer', example: 3 },
+              },
+            },
+            shops: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 8 },
+                branchCount: { type: 'integer', description: 'Branches that have at least one shop', example: 3 },
+              },
+            },
+            warehouses: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 5 },
+                active: { type: 'integer' },
+              },
+            },
+          },
+        },
+        OrganizationPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/OrganizationSummary' },
+              },
+            },
+          ],
+        },
+        LocationChild: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Main Warehouse' },
+            type: { type: 'string', enum: ['warehouse', 'shop'] },
+            code: { type: 'string', example: 'WH-001' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
           },
         },
         ErrorEnvelope: {
@@ -281,6 +340,9 @@ export function buildOpenApiSpec(serverUrl = '/') {
             _id: objectId,
             name: { type: 'string' },
             code: { type: 'string' },
+            phone: { type: 'string', description: 'On warehouse and shop detail' },
+            location: { type: 'string' },
+            address: { type: 'string', description: 'On warehouse and shop detail' },
           },
         },
         Branch: {
@@ -290,9 +352,17 @@ export function buildOpenApiSpec(serverUrl = '/') {
             name: { type: 'string' },
             code: { type: 'string', example: 'KHI' },
             phone: { type: 'string' },
-            address: { type: 'string' },
-            managerId: { ...objectId, nullable: true },
+            location: { type: 'string', description: 'Short area shown in the register, for example City Center' },
+            address: { type: 'string', description: 'Operating address. Omitted from lists.' },
+            managerId: { ...objectId, nullable: true, description: 'Null until Employee exists. The register shows Unassigned.' },
             status: { type: 'string', enum: ['active', 'inactive'] },
+            warehouseCount: { type: 'integer', description: 'On the register and on GET /branches/{id}' },
+            shopCount: { type: 'integer' },
+            locations: {
+              type: 'array',
+              description: 'On GET /branches/{id}. Warehouses first, then shops.',
+              items: { $ref: '#/components/schemas/LocationChild' },
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -304,6 +374,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             name: { type: 'string' },
             code: { type: 'string', description: 'Stored uppercase' },
             phone: { type: 'string' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true, description: 'Null until Employee exists' },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -315,6 +386,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             name: { type: 'string' },
             code: { type: 'string' },
             phone: { type: 'string' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -327,9 +399,15 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: { $ref: '#/components/schemas/BranchRef' },
             name: { type: 'string' },
             code: { type: 'string' },
-            address: { type: 'string' },
-            managerId: { ...objectId, nullable: true },
+            location: { type: 'string', description: 'Short area shown in the register' },
+            address: { type: 'string', description: 'Operating address. Omitted from lists.' },
+            managerId: { ...objectId, nullable: true, description: 'Null until Employee exists. The register shows Unassigned.' },
             status: { type: 'string', enum: ['active', 'inactive'] },
+            locations: {
+              type: 'array',
+              description: 'On GET /warehouses/{id}. Other warehouses and shops of the same branch. Warehouses first, then shops.',
+              items: { $ref: '#/components/schemas/LocationChild' },
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -341,6 +419,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: objectId,
             name: { type: 'string' },
             code: { type: 'string', description: 'Stored uppercase' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -352,6 +431,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: objectId,
             name: { type: 'string' },
             code: { type: 'string' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -364,9 +444,14 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: { $ref: '#/components/schemas/BranchRef' },
             name: { type: 'string' },
             code: { type: 'string' },
-            address: { type: 'string' },
+            location: { type: 'string' },
+            address: { type: 'string', description: 'Operating address. Omitted from lists.' },
             managerId: { ...objectId, nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
+            locations: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/LocationChild' },
+            },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -378,6 +463,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: objectId,
             name: { type: 'string' },
             code: { type: 'string', description: 'Stored uppercase' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -389,6 +475,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
             branchId: objectId,
             name: { type: 'string' },
             code: { type: 'string' },
+            location: { type: 'string' },
             address: { type: 'string' },
             managerId: { type: 'string', nullable: true },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -428,6 +515,193 @@ export function buildOpenApiSpec(serverUrl = '/') {
             symbol: { type: 'string' },
             decimalPlaces: { type: 'integer', minimum: 0, maximum: 6 },
             isBaseCurrency: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        ProductCategoryNode: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+            parentId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active'] },
+            children: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/ProductCategoryNode' },
+            },
+          },
+        },
+        ProductCategory: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+            parentId: { ...objectId, nullable: true },
+            description: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        ProductCategoryWrite: {
+          type: 'object',
+          required: ['name', 'code'],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            parentId: { ...objectId, nullable: true },
+            description: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        ProductCategoryUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string' },
+            parentId: { ...objectId, nullable: true },
+            description: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        QuantityUnit: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            shortCode: { type: 'string', example: 'KG' },
+            decimalAllowed: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        QuantityUnitWrite: {
+          type: 'object',
+          required: ['name', 'shortCode'],
+          properties: {
+            name: { type: 'string' },
+            shortCode: { type: 'string', description: 'Stored uppercase' },
+            decimalAllowed: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        QuantityUnitUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+            decimalAllowed: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        UnitRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+          },
+        },
+        PackingUnit: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+            conversionQuantity: { type: 'string', example: '12' },
+            quantityUnitId: { $ref: '#/components/schemas/UnitRef' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        PackingUnitWrite: {
+          type: 'object',
+          required: ['name', 'shortCode', 'conversionQuantity', 'quantityUnitId'],
+          properties: {
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+            conversionQuantity: { type: 'string', example: '12', description: 'Positive decimal string' },
+            quantityUnitId: objectId,
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        PackingUnitUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+            conversionQuantity: { type: 'string' },
+            quantityUnitId: objectId,
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        CategoryRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string' },
+          },
+        },
+        Product: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            categoryId: { $ref: '#/components/schemas/CategoryRef' },
+            sku: { type: 'string' },
+            name: { type: 'string' },
+            barcode: { type: 'string', nullable: true },
+            description: { type: 'string', description: 'Omitted from list responses' },
+            quantityUnitId: { $ref: '#/components/schemas/UnitRef' },
+            packingUnitId: { anyOf: [{ $ref: '#/components/schemas/UnitRef' }, { type: 'null' }] },
+            costPrice: { type: 'string', example: '10.50' },
+            salePrice: { type: 'string', example: '15.00' },
+            reorderLevel: { type: 'string', example: '0' },
+            trackBatch: { type: 'boolean' },
+            trackExpiry: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        ProductWrite: {
+          type: 'object',
+          required: ['categoryId', 'sku', 'name', 'quantityUnitId', 'costPrice', 'salePrice', 'reorderLevel'],
+          properties: {
+            categoryId: objectId,
+            sku: { type: 'string', description: 'Stored uppercase' },
+            name: { type: 'string' },
+            barcode: { type: 'string', nullable: true },
+            description: { type: 'string' },
+            quantityUnitId: objectId,
+            packingUnitId: { ...objectId, nullable: true },
+            costPrice: { type: 'string', example: '10.50' },
+            salePrice: { type: 'string', example: '15.00' },
+            reorderLevel: { type: 'string', example: '0' },
+            trackBatch: { type: 'boolean' },
+            trackExpiry: { type: 'boolean' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        ProductUpdate: {
+          type: 'object',
+          properties: {
+            categoryId: objectId,
+            sku: { type: 'string' },
+            name: { type: 'string' },
+            barcode: { type: 'string', nullable: true },
+            description: { type: 'string' },
+            quantityUnitId: objectId,
+            packingUnitId: { ...objectId, nullable: true },
+            costPrice: { type: 'string' },
+            salePrice: { type: 'string' },
+            reorderLevel: { type: 'string' },
+            trackBatch: { type: 'boolean' },
+            trackExpiry: { type: 'boolean' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
         },

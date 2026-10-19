@@ -1,4 +1,4 @@
-export function success(description, dataSchema, { list = false } = {}) {
+export function success(description, dataSchema, { list = false, meta } = {}) {
   const properties = {
     success: { type: 'boolean', example: true },
     message: { type: 'string' },
@@ -6,7 +6,7 @@ export function success(description, dataSchema, { list = false } = {}) {
   }
   const required = ['success', 'message', 'data']
   if (list) {
-    properties.meta = { $ref: '#/components/schemas/PageMeta' }
+    properties.meta = meta || { $ref: '#/components/schemas/PageMeta' }
     required.push('meta')
   }
   return {

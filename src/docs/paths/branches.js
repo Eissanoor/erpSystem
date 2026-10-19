@@ -9,5 +9,6 @@ export const branchPaths = locationPaths({
   writeSchema: '#/components/schemas/BranchWrite',
   updateSchema: '#/components/schemas/BranchUpdate',
   permission: 'branch',
+  workspace: true,
   statusDescription: 'Sets active or inactive. Warehouses and shops under this branch stay as they are.',
 })

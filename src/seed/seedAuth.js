@@ -8,8 +8,24 @@ import { Branch } from '../modules/branch/branch.model.js'
 import { Warehouse } from '../modules/warehouse/warehouse.model.js'
 import { Shop } from '../modules/shop/shop.model.js'
 import { Currency } from '../modules/currency/currency.model.js'
+import { ProductCategory } from '../modules/productCategory/productCategory.model.js'
+import { QuantityUnit } from '../modules/quantityUnit/quantityUnit.model.js'
+import { PackingUnit } from '../modules/packingUnit/packingUnit.model.js'
+import { Product } from '../modules/product/product.model.js'
 
-const MODULES = ['user', 'role', 'permission', 'branch', 'warehouse', 'shop', 'currency']
+const MODULES = [
+  'user',
+  'role',
+  'permission',
+  'branch',
+  'warehouse',
+  'shop',
+  'currency',
+  'product_category',
+  'quantity_unit',
+  'packing_unit',
+  'product',
+]
 const ACTIONS = ['create', 'read', 'update']
 
 export const SEEDED_PERMISSIONS = [
@@ -44,6 +60,10 @@ export async function seedAuth() {
     Warehouse.init(),
     Shop.init(),
     Currency.init(),
+    ProductCategory.init(),
+    QuantityUnit.init(),
+    PackingUnit.init(),
+    Product.init(),
   ])
 
   await Permission.bulkWrite(

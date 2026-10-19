@@ -20,6 +20,10 @@ import { branchRouter } from './modules/branch/branch.routes.js'
 import { warehouseRouter } from './modules/warehouse/warehouse.routes.js'
 import { shopRouter } from './modules/shop/shop.routes.js'
 import { currencyRouter } from './modules/currency/currency.routes.js'
+import { productCategoryRouter } from './modules/productCategory/productCategory.routes.js'
+import { quantityUnitRouter } from './modules/quantityUnit/quantityUnit.routes.js'
+import { packingUnitRouter } from './modules/packingUnit/packingUnit.routes.js'
+import { productRouter } from './modules/product/product.routes.js'
 
 function requestOrigin(req) {
   const forwarded = req.get('x-forwarded-proto')
@@ -94,6 +98,10 @@ export function createApp() {
   app.use('/api/v1/warehouses', warehouseRouter)
   app.use('/api/v1/shops', shopRouter)
   app.use('/api/v1/currencies', currencyRouter)
+  app.use('/api/v1/product-categories', productCategoryRouter)
+  app.use('/api/v1/quantity-units', quantityUnitRouter)
+  app.use('/api/v1/packing-units', packingUnitRouter)
+  app.use('/api/v1/products', productRouter)
 
   app.use(notFound)
   app.use(errorHandler)

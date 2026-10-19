@@ -25,6 +25,24 @@ export const locationCode = Joi.string()
 
 export const currencyCode = Joi.string().trim().uppercase().length(3).pattern(/^[A-Z]{3}$/)
 
+export const shortCodeField = Joi.string()
+  .trim()
+  .uppercase()
+  .pattern(/^[A-Z0-9][A-Z0-9-]{0,15}$/)
+
+export const skuField = Joi.string()
+  .trim()
+  .uppercase()
+  .pattern(/^[A-Z0-9][A-Z0-9-]{0,63}$/)
+
+export const moneyString = Joi.string()
+  .trim()
+  .pattern(/^(?:0|[1-9]\d*)(?:\.\d+)?$/)
+
+export const positiveDecimalString = Joi.string()
+  .trim()
+  .pattern(/^(?:[1-9]\d*(?:\.\d+)?|0?\.\d*[1-9]\d*)$/)
+
 export const masterStatusBody = Joi.object({
   status: Joi.string()
     .valid(...MASTER_STATUS)

@@ -9,6 +9,13 @@ export const ORG_CACHE = {
   currencies: 'org:currencies',
 }
 
+export const PROD_CACHE = {
+  categories: 'prod:categories',
+  units: 'prod:units',
+  packing: 'prod:packing',
+  products: 'prod:products:active',
+}
+
 export function isDropdownList(query) {
   return (
     Number(query.page) === 1 &&
@@ -24,9 +31,9 @@ function scopeKey(user) {
   return [...(user?.branchIds || [])].map(String).sort().join(',')
 }
 
-export function readDropdown(prefix, user, query, loader) {
+export function readDropdown(prefix, user, query, loader, scopeId) {
   if (!isDropdownList(query)) return loader()
-  const parent = query.branchId ? String(query.branchId) : 'any'
+  const parent = scopeId ? String(scopeId) : query.branchId ? String(query.branchId) : 'any'
   const key = `${prefix}:dropdown:${scopeKey(user)}:${parent}`
   return cache.getOrSet(key, MASTER_TTL_SECONDS, loader)
 }

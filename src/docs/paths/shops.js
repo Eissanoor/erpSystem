@@ -9,6 +9,7 @@ export const shopPaths = locationPaths({
   writeSchema: '#/components/schemas/ShopWrite',
   updateSchema: '#/components/schemas/ShopUpdate',
   permission: 'shop',
+  workspace: true,
   extraListParams: [branchIdQuery],
   statusDescription: 'Sets active or inactive. The parent branch is left unchanged.',
 })
