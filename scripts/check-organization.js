@@ -190,6 +190,60 @@ try {
     'branch hierarchy lists warehouses before shops',
   )
 
+  const edited = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Org Branch A',
+      branchType: 'operating',
+      openingDate: '2026-01-01',
+      address: '18 Commerce Avenue',
+      location: 'City Center',
+      email: 'central@example.com',
+      phone: '',
+      managerId: null,
+      defaultWarehouseId: warehouseA._id,
+      defaultShopId: shopA._id,
+      status: 'active',
+      costCentre: 'CC-CEN',
+      documentPrefix: 'cen',
+      document: {
+        type: 'Registration / lease',
+        reference: 'DOC-2026-001',
+        fileName: 'agreement-or-record.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(edited, 200, 'edit branch')
+  assert(edited.json.data.branchTypeLabel === 'Operating branch', 'edit returns the branch type label')
+  assert(edited.json.data.address === '18 Commerce Avenue', 'edit stores the address')
+  assert(edited.json.data.location === 'City Center', 'edit stores the city')
+  assert(edited.json.data.email === 'central@example.com', 'edit stores the email')
+  assert(edited.json.data.costCentre === 'CC-CEN', 'edit stores the cost centre')
+  assert(edited.json.data.documentPrefix === 'CEN', 'edit stores the document prefix')
+  assert(edited.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
+  assert(edited.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
+  assert(parentId(edited.json.data.defaultWarehouseId) === String(warehouseA._id), 'edit sets the default warehouse')
+  assert(edited.json.data.defaultWarehouseId?.name === 'Org Warehouse A', 'default warehouse name is returned')
+  assert(parentId(edited.json.data.defaultShopId) === String(shopA._id), 'edit sets the default shop')
+  assert(edited.json.data.code === 'ORG-A', 'edit keeps the branch code')
+  const warehouseAfterEdit = await request('GET', `/api/v1/warehouses/${warehouseA._id}`, { token: adminToken })
+  assertStatus(warehouseAfterEdit, 200, 'warehouse remains after branch edit')
+  assert(warehouseAfterEdit.json.data.name === 'Org Warehouse A', 'branch edit leaves the warehouse record as it was')
+
+  const foreignDefault = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
+    token: adminToken,
+    body: { defaultWarehouseId: warehouseB._id },
+  })
+  assertStatus(foreignDefault, 400, 'edit rejects a warehouse from another branch')
+  assert(foreignDefault.json.errors?.[0]?.field === 'defaultWarehouseId', 'foreign default warehouse field')
+
+  const badFile = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
+    token: adminToken,
+    body: { document: { fileName: 'notes.txt' } },
+  })
+  assertStatus(badFile, 400, 'edit rejects a file that is not pdf or image')
+
   const branchRegister = await request('GET', '/api/v1/branches?limit=100', { token: adminToken })
   assertStatus(branchRegister, 200, 'branch register')
   const branchRow = branchRegister.json.data.find((item) => item.code === 'ORG-A')
@@ -398,7 +452,7 @@ try {
   })
   assertStatus(missingType, 400, 'branch type is required')
 
-  const foreignDefault = await request('POST', '/api/v1/branches', {
+  const foreignCreate = await request('POST', '/api/v1/branches', {
     token: adminToken,
     body: {
       name: 'Default Miss',
@@ -408,8 +462,8 @@ try {
       defaultWarehouseId: warehouseA._id,
     },
   })
-  assertStatus(foreignDefault, 400, 'default warehouse must belong to the new branch')
-  assert(foreignDefault.json.errors?.[0]?.field === 'defaultWarehouseId', 'default warehouse field')
+  assertStatus(foreignCreate, 400, 'default warehouse must belong to the new branch')
+  assert(foreignCreate.json.errors?.[0]?.field === 'defaultWarehouseId', 'default warehouse field')
   await Branch.deleteOne({ _id: formBranch.json.data._id })
 
   const codeInput = `cache-${Date.now().toString(36)}`

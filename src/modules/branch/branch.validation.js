@@ -18,6 +18,11 @@ const notes = Joi.string().trim().allow('').max(2000)
 const document = Joi.object({
   type: Joi.string().trim().allow('').max(80),
   reference: Joi.string().trim().allow('').max(120),
+  fileName: Joi.string()
+    .trim()
+    .max(180)
+    .allow('')
+    .pattern(/\.(pdf|png|jpe?g)$/i),
 })
 
 export const branchListQuery = listQuery(MASTER_STATUS)

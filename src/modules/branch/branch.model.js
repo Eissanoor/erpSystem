@@ -6,6 +6,7 @@ const documentSchema = new mongoose.Schema(
   {
     type: { type: String, trim: true, default: '' },
     reference: { type: String, trim: true, default: '' },
+    fileName: { type: String, trim: true, default: '' },
   },
   { _id: false },
 )

@@ -378,6 +378,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
               properties: {
                 type: { type: 'string', example: 'Registration / lease' },
                 reference: { type: 'string' },
+                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
               },
             },
             notes: { type: 'string', description: 'Internal notes. Omitted from lists.' },
@@ -418,6 +419,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
               properties: {
                 type: { type: 'string' },
                 reference: { type: 'string' },
+                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
               },
             },
             notes: { type: 'string' },
@@ -445,6 +447,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
               properties: {
                 type: { type: 'string' },
                 reference: { type: 'string' },
+                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
               },
             },
             notes: { type: 'string' },

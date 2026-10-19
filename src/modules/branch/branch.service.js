@@ -69,6 +69,7 @@ function documentFrom(body, current = {}) {
   return {
     type: body.document?.type ?? current.type ?? '',
     reference: body.document?.reference ?? current.reference ?? '',
+    fileName: body.document?.fileName ?? current.fileName ?? '',
   }
 }
 
