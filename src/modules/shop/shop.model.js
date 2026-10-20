@@ -2,15 +2,6 @@ import mongoose from 'mongoose'
 import { MASTER_STATUS } from '../../common/constants/status.js'
 import { SHOP_TYPES } from './shop.constants.js'
 
-const documentSchema = new mongoose.Schema(
-  {
-    type: { type: String, trim: true, default: '' },
-    reference: { type: String, trim: true, default: '' },
-    fileName: { type: String, trim: true, default: '' },
-  },
-  { _id: false },
-)
-
 const shopSchema = new mongoose.Schema(
   {
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
@@ -27,7 +18,6 @@ const shopSchema = new mongoose.Schema(
     cashAccount: { type: String, trim: true, default: '' },
     openingHours: { type: String, trim: true, default: '' },
     status: { type: String, enum: MASTER_STATUS, default: 'active' },
-    document: { type: documentSchema, default: () => ({}) },
     notes: { type: String, trim: true, default: '' },
   },
   { timestamps: true },

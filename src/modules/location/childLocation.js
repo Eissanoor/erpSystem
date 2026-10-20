@@ -107,7 +107,6 @@ export function createChildLocationService({
       const extra = link ? await link(body, branchId, doc) : {}
       doc.set(pick(body, writeFields))
       if (extra.warehouseId !== undefined) doc.warehouseId = extra.warehouseId
-      if (extra.document) doc.document = extra.document
       try {
         await doc.save()
       } catch (error) {

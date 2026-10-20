@@ -8,15 +8,6 @@ import {
   LOCATION_TYPES,
 } from './employee.constants.js'
 
-const documentSchema = new mongoose.Schema(
-  {
-    type: { type: String, trim: true, default: '' },
-    reference: { type: String, trim: true, default: '' },
-    fileName: { type: String, trim: true, default: '' },
-  },
-  { _id: false },
-)
-
 const assignmentSchema = new mongoose.Schema(
   {
     locationType: { type: String, enum: LOCATION_TYPES, required: true },
@@ -46,7 +37,6 @@ const employeeSchema = new mongoose.Schema(
     branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', required: true },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: { type: String, enum: EMPLOYMENT_STATUS, default: 'active' },
-    document: { type: documentSchema, default: () => ({}) },
     notes: { type: String, trim: true, default: '' },
     assignments: { type: [assignmentSchema], default: [] },
   },

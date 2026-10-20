@@ -20,7 +20,7 @@ export const warehousePaths = locationPaths({
     { $ref: '#/components/parameters/limit' },
   ],
   updateDescription:
-    'Edit warehouse. Send the form fields. A new document.fileName replaces the attached file. Fields left out, including zones, stay as they are. Linked shops are left unchanged.',
+    'Edit warehouse. Fields left out, including zones, stay as they are. Linked shops are left unchanged.',
   extraListParams: [branchIdQuery],
   statusDescription: 'Sets active or inactive. The parent branch is left unchanged.',
 })

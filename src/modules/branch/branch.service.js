@@ -14,7 +14,7 @@ import { Branch } from './branch.model.js'
 const SORT_FIELDS = ['name', 'code', 'status', 'createdAt']
 const LIST_FIELDS = 'name code phone location managerId status createdAt updatedAt'
 const DETAIL_FIELDS =
-  'name code branchType openingDate phone email location address managerId defaultWarehouseId defaultShopId status costCentre documentPrefix document notes createdAt updatedAt'
+  'name code branchType openingDate phone email location address managerId defaultWarehouseId defaultShopId status costCentre documentPrefix notes createdAt updatedAt'
 const WRITE_FIELDS = [
   'name',
   'code',
@@ -63,14 +63,6 @@ function assertCanSee(id, user) {
 
 function blank(value) {
   return value === undefined || value === null || value === '' ? null : value
-}
-
-function documentFrom(body, current = {}) {
-  return {
-    type: body.document?.type ?? current.type ?? '',
-    reference: body.document?.reference ?? current.reference ?? '',
-    fileName: body.document?.fileName ?? current.fileName ?? '',
-  }
 }
 
 async function assertOwnedChild(Model, id, branchId, field, noun) {
@@ -179,7 +171,6 @@ export async function create(body) {
       status: body.status || 'active',
       costCentre: body.costCentre || '',
       documentPrefix: body.documentPrefix || '',
-      document: documentFrom(body),
       notes: body.notes || '',
     })
     await assertOwnedChild(Warehouse, blank(body.defaultWarehouseId), branch._id, 'defaultWarehouseId', 'Warehouse')
@@ -205,7 +196,6 @@ export async function update(id, body, user) {
   const patch = pick(body, WRITE_FIELDS)
   if ('openingDate' in patch) patch.openingDate = blank(patch.openingDate)
   branch.set(patch)
-  if (body.document) branch.document = documentFrom(body, branch.document)
   branch.defaultWarehouseId = nextWarehouse
   branch.defaultShopId = nextShop
   branch.managerId = null

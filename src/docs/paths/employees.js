@@ -61,7 +61,7 @@ export const employeePaths = {
       operationId: 'updateEmployee',
       summary: 'Update an employee',
       description:
-        'Edit employee. Send the form fields. A new document.fileName replaces the attached file, and fields left out of document stay as they are. Omitting assignments leaves the location table as it is. This does not create or change the linked user login.',
+        'Edit employee. Omitting assignments leaves the location table as it is. This does not create or change the linked user login.',
       security: bearer,
       parameters: idParam,
       requestBody: {

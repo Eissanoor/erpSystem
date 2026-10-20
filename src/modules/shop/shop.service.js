@@ -8,7 +8,7 @@ import { SHOP_TYPE_LABELS } from './shop.constants.js'
 import { Shop } from './shop.model.js'
 
 const DETAIL_FIELDS =
-  'branchId warehouseId name code shopType location address phone email managerId priceList cashAccount openingHours status document notes createdAt updatedAt'
+  'branchId warehouseId name code shopType location address phone email managerId priceList cashAccount openingHours status notes createdAt updatedAt'
 const WRITE_FIELDS = [
   'branchId',
   'name',
@@ -37,7 +37,7 @@ function blank(value) {
 async function link(body, branchId, current = {}) {
   const sent = Object.prototype.hasOwnProperty.call(body, 'warehouseId')
   const warehouseId = sent ? blank(body.warehouseId) : current.warehouseId || null
-  if (!warehouseId) return { warehouseId: null, ...documentOf(body, current) }
+  if (!warehouseId) return { warehouseId: null }
   const warehouse = await Warehouse.findById(warehouseId).select('branchId status').lean()
   if (!warehouse || String(warehouse.branchId) !== String(branchId)) {
     throw new ApiError(400, 'Warehouse must belong to this branch', [
@@ -49,18 +49,7 @@ async function link(body, branchId, current = {}) {
       { field: 'warehouseId', message: 'Warehouse must be active' },
     ])
   }
-  return { warehouseId, ...documentOf(body, current) }
-}
-
-function documentOf(body, current = {}) {
-  if (!body.document && !current.document) return {}
-  return {
-    document: {
-      type: body.document?.type ?? current.document?.type ?? '',
-      reference: body.document?.reference ?? current.document?.reference ?? '',
-      fileName: body.document?.fileName ?? current.document?.fileName ?? '',
-    },
-  }
+  return { warehouseId }
 }
 
 async function decorate(doc, user, branchId) {

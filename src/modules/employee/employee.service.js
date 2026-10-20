@@ -23,7 +23,7 @@ import { Employee } from './employee.model.js'
 
 const LIST_FIELDS = 'name code department branchId status createdAt updatedAt'
 const DETAIL_FIELDS =
-  'name code email phone department jobTitle employmentType joiningDate reportsTo shopAssignment warehouseAccess erpRole createLogin branchId userId status document notes assignments createdAt updatedAt'
+  'name code email phone department jobTitle employmentType joiningDate reportsTo shopAssignment warehouseAccess erpRole createLogin branchId userId status notes assignments createdAt updatedAt'
 const WRITE_FIELDS = [
   'name',
   'code',
@@ -44,14 +44,6 @@ const WRITE_FIELDS = [
 ]
 const SORT_FIELDS = ['name', 'code', 'department', 'status', 'createdAt']
 const POPULATE = { path: 'branchId', select: 'name code' }
-
-function documentFrom(body, current = {}) {
-  return {
-    type: body.document?.type ?? current.document?.type ?? '',
-    reference: body.document?.reference ?? current.document?.reference ?? '',
-    fileName: body.document?.fileName ?? current.document?.fileName ?? '',
-  }
-}
 
 function blank(value) {
   return value === undefined || value === null || value === '' ? null : value
@@ -255,7 +247,6 @@ export async function create(body, user) {
       ...(userId ? { userId } : {}),
       joiningDate: body.joiningDate || null,
       status: body.status || 'active',
-      document: documentFrom(body),
       assignments,
     })
     return presentDetail(await load(doc._id), user)
@@ -277,7 +268,6 @@ export async function update(id, body, user) {
   if (Object.prototype.hasOwnProperty.call(body, 'assignments')) {
     doc.assignments = await assertAssignments(body.assignments, user)
   }
-  if (body.document) doc.document = documentFrom(body, doc)
   doc.set(pick(body, WRITE_FIELDS))
   try {
     await doc.save()

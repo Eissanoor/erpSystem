@@ -202,11 +202,6 @@ try {
       binTracking: 'Enabled',
       negativeStock: 'Not allowed',
       status: 'active',
-      document: {
-        type: 'Warehouse layout / lease',
-        reference: 'LEASE-001',
-        fileName: 'warehouse-layout.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -221,8 +216,6 @@ try {
   assert(addedWarehouse.json.data.defaultZone === 'Zone A', 'default zone is stored')
   assert(addedWarehouse.json.data.binTracking === 'Enabled', 'bin tracking is stored')
   assert(addedWarehouse.json.data.negativeStock === 'Not allowed', 'negative stock is stored')
-  assert(addedWarehouse.json.data.document?.type === 'Warehouse layout / lease', 'warehouse document type is stored')
-  assert(addedWarehouse.json.data.document?.fileName === 'warehouse-layout.pdf', 'warehouse document file name is stored')
   assert(addedWarehouse.json.data.notes === 'Add remarks for authorized workspace administrators', 'warehouse notes are stored')
   assert(addedWarehouse.json.data.managerId === null, 'custodian stays empty until employees exist')
   assert(addedWarehouse.json.data.code === warehouseCode.toUpperCase(), 'warehouse code is stored uppercase')
@@ -263,11 +256,6 @@ try {
       binTracking: 'Enabled',
       negativeStock: 'Blocked',
       status: 'active',
-      document: {
-        type: 'Warehouse layout / lease',
-        reference: 'DOC-2026-001',
-        fileName: 'agreement-or-record.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -281,8 +269,6 @@ try {
   assert(editedWarehouse.json.data.defaultZone === 'Zone A', 'edit stores the default zone')
   assert(editedWarehouse.json.data.binTracking === 'Enabled', 'edit stores bin tracking')
   assert(editedWarehouse.json.data.negativeStock === 'Blocked', 'edit stores negative stock')
-  assert(editedWarehouse.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
-  assert(editedWarehouse.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
   assert(editedWarehouse.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the warehouse notes')
   assert(editedWarehouse.json.data.managerId === null, 'edit leaves the custodian empty')
   assert(editedWarehouse.json.data.code === warehouseCode.toUpperCase(), 'edit stores the code uppercase')
@@ -293,18 +279,11 @@ try {
     token: adminToken,
     body: { name: 'Main Warehouse' },
   })
-  assertStatus(keptDocument, 200, 'edit without a new file')
-  assert(keptDocument.json.data.document?.reference === 'DOC-2026-001', 'existing document reference stays')
-  assert(keptDocument.json.data.document?.fileName === 'agreement-or-record.pdf', 'existing document file stays')
+  assertStatus(keptDocument, 200, 'edit keeps the warehouse name')
   assert(keptDocument.json.data.zones[0]?.code === 'ZN-A', 'zone stays after a later edit')
   const shopAfterWarehouseEdit = await request('GET', `/api/v1/shops/${shopA._id}`, { token: adminToken })
   assert(shopAfterWarehouseEdit.json.data.name === shopBeforeWarehouseEdit.json.data.name, 'warehouse edit leaves the shop name')
   assert(shopAfterWarehouseEdit.json.data.code === shopBeforeWarehouseEdit.json.data.code, 'warehouse edit leaves the shop code')
-  const badWarehouseEditFile = await request('PATCH', `/api/v1/warehouses/${addedWarehouse.json.data._id}`, {
-    token: adminToken,
-    body: { document: { fileName: 'notes.txt' } },
-  })
-  assertStatus(badWarehouseEditFile, 400, 'edit warehouse rejects a file that is not pdf or image')
   await Warehouse.deleteOne({ _id: addedWarehouse.json.data._id })
 
   const missingAddress = await request('POST', '/api/v1/warehouses', {
@@ -312,17 +291,6 @@ try {
     body: { name: 'No Address', code: 'NO-WH-ADDR', branchId: branchA._id },
   })
   assertStatus(missingAddress, 400, 'warehouse address is required')
-  const badWarehouseFile = await request('POST', '/api/v1/warehouses', {
-    token: adminToken,
-    body: {
-      name: 'Bad File',
-      code: 'BAD-WH-FILE',
-      branchId: branchA._id,
-      address: '1 Road',
-      document: { fileName: 'notes.txt' },
-    },
-  })
-  assertStatus(badWarehouseFile, 400, 'warehouse file must be pdf or image')
   assert(
     warehousePage.json.data.locations.some((row) => row.type === 'warehouse' && row.code === 'ORG-WA'),
     'location hierarchy includes the warehouse',
@@ -382,11 +350,6 @@ try {
       openingHours: '09:00-21:00',
       status: 'active',
       managerId: null,
-      document: {
-        type: 'Shop lease / registration',
-        reference: 'LEASE-001',
-        fileName: 'shop-lease.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -402,8 +365,6 @@ try {
   assert(addedShop.json.data.priceList === 'Retail', 'price list is stored')
   assert(addedShop.json.data.cashAccount === 'Cash-CEN', 'cash account is stored')
   assert(addedShop.json.data.openingHours === '09:00-21:00', 'opening hours are stored')
-  assert(addedShop.json.data.document?.type === 'Shop lease / registration', 'shop document type is stored')
-  assert(addedShop.json.data.document?.fileName === 'shop-lease.pdf', 'shop document file name is stored')
   assert(addedShop.json.data.managerId === null, 'shop manager stays empty until employees exist')
   assert(parentId(addedShop.json.data.warehouseId) === String(warehouseA._id), 'add shop links a warehouse in the branch')
   assert(addedShop.json.data.code === shopCode.toUpperCase(), 'shop code is stored uppercase')
@@ -446,11 +407,6 @@ try {
       cashAccount: 'Central shop cash',
       openingHours: '09:00-18:00',
       status: 'active',
-      document: {
-        type: 'Shop lease / registration',
-        reference: 'DOC-2026-001',
-        fileName: 'agreement-or-record.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -462,8 +418,6 @@ try {
   assert(linkedShop.json.data.priceList === 'Standard retail', 'edit stores the price list')
   assert(linkedShop.json.data.cashAccount === 'Central shop cash', 'edit stores the cash account')
   assert(linkedShop.json.data.openingHours === '09:00-18:00', 'edit stores the opening hours')
-  assert(linkedShop.json.data.document?.reference === 'DOC-2026-001', 'edit stores the shop document reference')
-  assert(linkedShop.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the shop file name')
   assert(linkedShop.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the shop notes')
   assert(parentId(linkedShop.json.data.branchId) === String(branchA._id), 'edit keeps the parent branch')
   assert(parentId(linkedShop.json.data.warehouseId) === String(warehouseA._id), 'shop stores its linked warehouse')
@@ -487,11 +441,6 @@ try {
   const warehouseAfterShopEdit = await request('GET', `/api/v1/warehouses/${warehouseA._id}`, { token: adminToken })
   assertStatus(warehouseAfterShopEdit, 200, 'warehouse remains after shop edit')
   assert(warehouseAfterShopEdit.json.data.name === 'Org Warehouse A', 'shop edit leaves the warehouse record as it was')
-  const badShopFile = await request('PATCH', `/api/v1/shops/${shopA._id}`, {
-    token: adminToken,
-    body: { document: { fileName: 'notes.txt' } },
-  })
-  assertStatus(badShopFile, 400, 'edit shop rejects a file that is not pdf or image')
 
   const edited = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
     token: adminToken,
@@ -509,11 +458,6 @@ try {
       status: 'active',
       costCentre: 'CC-CEN',
       documentPrefix: 'cen',
-      document: {
-        type: 'Registration / lease',
-        reference: 'DOC-2026-001',
-        fileName: 'agreement-or-record.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -524,8 +468,6 @@ try {
   assert(edited.json.data.email === 'central@example.com', 'edit stores the email')
   assert(edited.json.data.costCentre === 'CC-CEN', 'edit stores the cost centre')
   assert(edited.json.data.documentPrefix === 'CEN', 'edit stores the document prefix')
-  assert(edited.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
-  assert(edited.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
   assert(parentId(edited.json.data.defaultWarehouseId) === String(warehouseA._id), 'edit sets the default warehouse')
   assert(edited.json.data.defaultWarehouseId?.name === 'Org Warehouse A', 'default warehouse name is returned')
   assert(parentId(edited.json.data.defaultShopId) === String(shopA._id), 'edit sets the default shop')
@@ -540,12 +482,6 @@ try {
   })
   assertStatus(foreignDefault, 400, 'edit rejects a warehouse from another branch')
   assert(foreignDefault.json.errors?.[0]?.field === 'defaultWarehouseId', 'foreign default warehouse field')
-
-  const badFile = await request('PATCH', `/api/v1/branches/${branchA._id}`, {
-    token: adminToken,
-    body: { document: { fileName: 'notes.txt' } },
-  })
-  assertStatus(badFile, 400, 'edit rejects a file that is not pdf or image')
 
   const branchRegister = await request('GET', '/api/v1/branches?limit=100', { token: adminToken })
   assertStatus(branchRegister, 200, 'branch register')
@@ -742,7 +678,6 @@ try {
       documentPrefix: 'cen',
       status: 'active',
       managerId: null,
-      document: { type: 'Registration / lease', reference: 'REG-10012' },
       notes: 'Authorized workspace note',
     },
   })
@@ -752,8 +687,6 @@ try {
   assert(formBranch.json.data.address === '18 Commerce Avenue', 'operating address is stored')
   assert(formBranch.json.data.email === 'central@gulzar.local', 'branch email is stored lowercase')
   assert(formBranch.json.data.documentPrefix === 'CEN', 'document prefix is stored uppercase')
-  assert(formBranch.json.data.document?.type === 'Registration / lease', 'document type is stored')
-  assert(formBranch.json.data.document?.reference === 'REG-10012', 'document reference is stored')
   assert(formBranch.json.data.notes === 'Authorized workspace note', 'internal notes are stored')
   assert(formBranch.json.data.managerId === null, 'manager stays empty until employees exist')
   assert(formBranch.json.data.defaultWarehouseId === null, 'new branch has no default warehouse')
@@ -942,11 +875,6 @@ try {
       createLogin: 'Invite by email',
       status: 'active',
       userId: null,
-      document: {
-        type: 'Employment contract / ID',
-        reference: 'DOC-2026-001',
-        fileName: 'agreement-or-record.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
       assignments: [
         { locationType: 'branch', locationId: branchA._id, scope: 'primary', accessRole: 'branch_manager', status: 'active' },
@@ -972,8 +900,6 @@ try {
   assert(addedEmployee.json.data.userId == null, 'create login does not create a user')
   assert(addedEmployee.json.data.loginStatusLabel === 'Invitation pending', 'login status label is invitation pending')
   assert(addedEmployee.json.data.branchId?.name === 'Org Branch A', 'detail includes the primary branch')
-  assert(addedEmployee.json.data.document?.type === 'Employment contract / ID', 'employee document type is stored')
-  assert(addedEmployee.json.data.document?.fileName === 'agreement-or-record.pdf', 'employee document file name is stored')
   assert(addedEmployee.json.data.notes === 'Add remarks for authorized workspace administrators', 'employee notes are stored')
   assert(addedEmployee.json.data.statusLabel === 'Active', 'employee status label is Active')
   assert(addedEmployee.json.data.loginStatus === 'pending', 'employee without a login is pending access')
@@ -1004,21 +930,6 @@ try {
     },
   })
   assertStatus(missingEmail, 400, 'work email is required')
-  const badEmployeeFile = await request('POST', '/api/v1/employees', {
-    token: adminToken,
-    body: {
-      name: 'Bad Employee File',
-      code: 'BAD-EMP-FILE',
-      email: 'bad-file@gulzar.local',
-      department: 'Operations',
-      jobTitle: 'Officer',
-      employmentType: 'full_time',
-      erpRole: 'staff',
-      branchId: branchA._id,
-      document: { fileName: 'notes.txt' },
-    },
-  })
-  assertStatus(badEmployeeFile, 400, 'employee file must be pdf or image')
 
   const employeeRegister = await request('GET', `/api/v1/employees?branchId=${branchA._id}&limit=100`, {
     token: adminToken,
@@ -1054,11 +965,6 @@ try {
       erpRole: 'branch_manager',
       createLogin: 'Invite by email',
       status: 'active',
-      document: {
-        type: 'Employment contract / ID',
-        reference: 'DOC-2026-001',
-        fileName: 'agreement-or-record.pdf',
-      },
       notes: 'Add remarks for authorized workspace administrators',
     },
   })
@@ -1075,26 +981,17 @@ try {
   assert(editedEmployee.json.data.createLogin === 'Invite by email', 'edit stores create login')
   assert(editedEmployee.json.data.loginStatusLabel === 'Invitation pending', 'edit leaves the login pending')
   assert(editedEmployee.json.data.userId == null, 'edit does not create a user')
-  assert(editedEmployee.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
-  assert(editedEmployee.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
   assert(editedEmployee.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the employee notes')
   assert(editedEmployee.json.data.code === employeeCode.toUpperCase(), 'edit stores the code uppercase')
   assert(parentId(editedEmployee.json.data.branchId) === String(branchA._id), 'edit keeps the primary branch')
   assert(editedEmployee.json.data.assignments.length === 3, 'edit keeps the location assignments')
   const keptEmployee = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}`, {
     token: adminToken,
-    body: { document: { fileName: 'agreement-or-record.pdf' } },
+    body: { name: 'Org Employee A' },
   })
-  assertStatus(keptEmployee, 200, 'edit without replacing the document fields')
-  assert(keptEmployee.json.data.document?.type === 'Employment contract / ID', 'existing document type stays')
-  assert(keptEmployee.json.data.document?.reference === 'DOC-2026-001', 'existing document reference stays')
+  assertStatus(keptEmployee, 200, 'later edit keeps the employee')
   assert(keptEmployee.json.data.assignments.length === 3, 'assignments stay after a later edit')
   assert(keptEmployee.json.data.loginStatus === 'pending', 'later edit leaves the login pending')
-  const badEmployeeEditFile = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}`, {
-    token: adminToken,
-    body: { document: { fileName: 'notes.txt' } },
-  })
-  assertStatus(badEmployeeEditFile, 400, 'edit employee rejects a file that is not pdf or image')
 
   const otherBranchEmployee = await request('POST', '/api/v1/employees', {
     token: adminToken,

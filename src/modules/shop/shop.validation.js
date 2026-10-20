@@ -12,15 +12,6 @@ const cashAccount = Joi.string().trim().allow('').max(80)
 const openingHours = Joi.string().trim().allow('').max(80)
 const notes = Joi.string().trim().allow('').max(2000)
 const warehouseId = objectId.allow(null, '')
-const document = Joi.object({
-  type: Joi.string().trim().allow('').max(80),
-  reference: Joi.string().trim().allow('').max(120),
-  fileName: Joi.string()
-    .trim()
-    .max(180)
-    .allow('')
-    .pattern(/\.(pdf|png|jpe?g)$/i),
-})
 
 const formFields = {
   shopType,
@@ -30,7 +21,6 @@ const formFields = {
   cashAccount,
   openingHours,
   warehouseId,
-  document,
   notes,
 }
 

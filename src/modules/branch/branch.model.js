@@ -2,15 +2,6 @@ import mongoose from 'mongoose'
 import { MASTER_STATUS } from '../../common/constants/status.js'
 import { BRANCH_TYPES } from './branch.constants.js'
 
-const documentSchema = new mongoose.Schema(
-  {
-    type: { type: String, trim: true, default: '' },
-    reference: { type: String, trim: true, default: '' },
-    fileName: { type: String, trim: true, default: '' },
-  },
-  { _id: false },
-)
-
 const branchSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -27,7 +18,6 @@ const branchSchema = new mongoose.Schema(
     status: { type: String, enum: MASTER_STATUS, default: 'active' },
     costCentre: { type: String, trim: true, default: '' },
     documentPrefix: { type: String, trim: true, uppercase: true, default: '' },
-    document: { type: documentSchema, default: () => ({}) },
     notes: { type: String, trim: true, default: '' },
   },
   { timestamps: true },

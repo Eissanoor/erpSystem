@@ -2,15 +2,6 @@ import mongoose from 'mongoose'
 import { MASTER_STATUS } from '../../common/constants/status.js'
 import { WAREHOUSE_TYPES, ZONE_USES } from './warehouse.constants.js'
 
-const documentSchema = new mongoose.Schema(
-  {
-    type: { type: String, trim: true, default: '' },
-    reference: { type: String, trim: true, default: '' },
-    fileName: { type: String, trim: true, default: '' },
-  },
-  { _id: false },
-)
-
 const zoneSchema = new mongoose.Schema(
   {
     code: { type: String, trim: true, uppercase: true, default: '' },
@@ -41,7 +32,6 @@ const warehouseSchema = new mongoose.Schema(
     negativeStock: { type: String, trim: true, default: '' },
     status: { type: String, enum: MASTER_STATUS, default: 'active' },
     zones: { type: [zoneSchema], default: [] },
-    document: { type: documentSchema, default: () => ({}) },
     notes: { type: String, trim: true, default: '' },
   },
   { timestamps: true },

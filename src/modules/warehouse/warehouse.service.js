@@ -5,7 +5,7 @@ import { WAREHOUSE_TYPE_LABELS, ZONE_USE_LABELS } from './warehouse.constants.js
 import { Warehouse } from './warehouse.model.js'
 
 const DETAIL_FIELDS =
-  'branchId name code warehouseType location address phone floorArea storageCapacity managerId stockAccount defaultZone binTracking negativeStock status zones document notes createdAt updatedAt'
+  'branchId name code warehouseType location address phone floorArea storageCapacity managerId stockAccount defaultZone binTracking negativeStock status zones notes createdAt updatedAt'
 const WRITE_FIELDS = [
   'branchId',
   'name',
@@ -24,21 +24,6 @@ const WRITE_FIELDS = [
   'status',
   'notes',
 ]
-
-function documentOf(body, current = {}) {
-  if (!body.document && !current.document) return {}
-  return {
-    document: {
-      type: body.document?.type ?? current.document?.type ?? '',
-      reference: body.document?.reference ?? current.document?.reference ?? '',
-      fileName: body.document?.fileName ?? current.document?.fileName ?? '',
-    },
-  }
-}
-
-async function link(body, _branchId, current = {}) {
-  return documentOf(body, current)
-}
 
 function pageZones(zones, query = {}) {
   const total = zones.length
@@ -82,7 +67,6 @@ const service = createChildLocationService({
   summarize: warehouseRegisterSummary,
   detailFields: DETAIL_FIELDS,
   writeFields: WRITE_FIELDS,
-  link,
   decorate,
 })
 

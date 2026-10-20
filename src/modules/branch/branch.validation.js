@@ -15,15 +15,6 @@ const optionalId = objectId.allow(null, '')
 const costCentre = Joi.string().trim().allow('').max(60)
 const documentPrefix = shortCodeField.allow('')
 const notes = Joi.string().trim().allow('').max(2000)
-const document = Joi.object({
-  type: Joi.string().trim().allow('').max(80),
-  reference: Joi.string().trim().allow('').max(120),
-  fileName: Joi.string()
-    .trim()
-    .max(180)
-    .allow('')
-    .pattern(/\.(pdf|png|jpe?g)$/i),
-})
 
 export const branchListQuery = listQuery(MASTER_STATUS)
 
@@ -49,7 +40,6 @@ export const createBranchBody = Joi.object({
     .default('active'),
   costCentre,
   documentPrefix,
-  document,
   notes,
 })
 
@@ -68,7 +58,6 @@ export const updateBranchBody = Joi.object({
   status: Joi.string().valid(...MASTER_STATUS),
   costCentre,
   documentPrefix,
-  document,
   notes,
 }).min(1)
 

@@ -376,14 +376,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             },
             costCentre: { type: 'string' },
             documentPrefix: { type: 'string', description: 'Stored uppercase' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', example: 'Registration / lease' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
-              },
-            },
             notes: { type: 'string', description: 'Internal notes. Omitted from lists.' },
             status: { type: 'string', enum: ['active', 'inactive'] },
             warehouseCount: { type: 'integer', description: 'Shops and warehouses of this branch' },
@@ -417,14 +409,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             status: { type: 'string', enum: ['active', 'inactive'] },
             costCentre: { type: 'string' },
             documentPrefix: { type: 'string', description: 'Stored uppercase' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
-              },
-            },
             notes: { type: 'string' },
           },
         },
@@ -445,14 +429,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             status: { type: 'string', enum: ['active', 'inactive'] },
             costCentre: { type: 'string' },
             documentPrefix: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'Attached PDF, JPG, or PNG. Send a new name to replace it.' },
-              },
-            },
             notes: { type: 'string' },
           },
         },
@@ -514,14 +490,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             binTracking: { type: 'string' },
             negativeStock: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', example: 'Warehouse layout / lease' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'PDF, JPG, or PNG. The file bytes are not stored.' },
-              },
-            },
             notes: { type: 'string' },
             summary: { $ref: '#/components/schemas/WarehouseRegisterSummary' },
             zones: {
@@ -557,14 +525,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             defaultZone: { type: 'string' },
             binTracking: { type: 'string' },
             negativeStock: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'PDF, JPG, or PNG' },
-              },
-            },
             notes: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
@@ -586,14 +546,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             defaultZone: { type: 'string' },
             binTracking: { type: 'string' },
             negativeStock: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string' },
-              },
-            },
             notes: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
@@ -650,14 +602,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             priceList: { type: 'string' },
             cashAccount: { type: 'string' },
             openingHours: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', example: 'Shop lease / registration' },
-                reference: { type: 'string' },
-                fileName: { type: 'string' },
-              },
-            },
             notes: { type: 'string' },
             managerId: { ...objectId, nullable: true, description: 'Null until Employee exists. The register shows the manager as empty.' },
             warehouseId: {
@@ -717,14 +661,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             priceList: { type: 'string' },
             cashAccount: { type: 'string' },
             openingHours: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'PDF, JPG, or PNG' },
-              },
-            },
             notes: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
@@ -745,14 +681,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             priceList: { type: 'string' },
             cashAccount: { type: 'string' },
             openingHours: { type: 'string' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string' },
-              },
-            },
             notes: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
           },
@@ -824,14 +752,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             userId: { ...objectId, nullable: true, description: 'Linked login. Empty means access is pending.' },
             status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
             statusLabel: { type: 'string', example: 'On leave' },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string', example: 'Employment contract / ID' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'PDF, JPG, or PNG. The file bytes are not stored.' },
-              },
-            },
             notes: { type: 'string' },
             loginStatus: {
               type: 'string',
@@ -870,14 +790,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             createLogin: { type: 'string', description: 'Leave empty to save without an ERP login' },
             userId: { ...objectId, nullable: true },
             status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string', description: 'PDF, JPG, or PNG' },
-              },
-            },
             notes: { type: 'string' },
             assignments: {
               type: 'array',
@@ -914,14 +826,6 @@ export function buildOpenApiSpec(serverUrl = '/') {
             createLogin: { type: 'string' },
             userId: { ...objectId, nullable: true },
             status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
-            document: {
-              type: 'object',
-              properties: {
-                type: { type: 'string' },
-                reference: { type: 'string' },
-                fileName: { type: 'string' },
-              },
-            },
             notes: { type: 'string' },
             assignments: {
               type: 'array',

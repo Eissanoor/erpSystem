@@ -24,15 +24,6 @@ const createLogin = Joi.string().trim().allow('').max(120)
 const notes = Joi.string().trim().allow('').max(2000)
 const status = Joi.string().valid(...EMPLOYMENT_STATUS)
 const userId = objectId.allow(null, '')
-const document = Joi.object({
-  type: Joi.string().trim().allow('').max(80),
-  reference: Joi.string().trim().allow('').max(120),
-  fileName: Joi.string()
-    .trim()
-    .max(180)
-    .allow('')
-    .pattern(/\.(pdf|png|jpe?g)$/i),
-})
 
 const assignment = Joi.object({
   locationType: Joi.string()
@@ -70,7 +61,6 @@ const formFields = {
   erpRole,
   createLogin,
   userId,
-  document,
   notes,
   assignments: Joi.array().items(assignment),
 }
@@ -92,7 +82,6 @@ export const createEmployeeBody = Joi.object({
   createLogin,
   userId,
   status: status.default('active'),
-  document,
   notes,
   assignments: Joi.array().items(assignment).default([]),
 })
