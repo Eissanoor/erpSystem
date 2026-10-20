@@ -3,6 +3,7 @@ import { branchPaths } from './paths/branches.js'
 import { permissionPaths } from './paths/permissions.js'
 import { rolePaths } from './paths/roles.js'
 import { shopPaths } from './paths/shops.js'
+import { employeePaths } from './paths/employees.js'
 import { userPaths } from './paths/users.js'
 import { warehousePaths } from './paths/warehouses.js'
 import { currencyPaths } from './paths/currencies.js'
@@ -33,6 +34,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Branches', description: 'Top-level locations' },
       { name: 'Warehouses', description: 'Inventory locations under a branch' },
       { name: 'Shops', description: 'Sales locations under a branch' },
+      { name: 'Employees', description: 'Employee profiles, departments, and location assignments' },
       { name: 'Currencies', description: 'Global currency master' },
       { name: 'Product categories', description: 'Product classification tree' },
       { name: 'Quantity units', description: 'Base measurement units' },
@@ -63,6 +65,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...branchPaths,
       ...warehousePaths,
       ...shopPaths,
+      ...employeePaths,
       ...currencyPaths,
       ...productCategoryPaths,
       ...quantityUnitPaths,
@@ -752,6 +755,185 @@ export function buildOpenApiSpec(serverUrl = '/') {
             },
             notes: { type: 'string' },
             status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        EmployeeRegisterSummary: {
+          type: 'object',
+          properties: {
+            employees: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 46 },
+                active: { type: 'integer', example: 42 },
+              },
+            },
+            departments: { type: 'integer', description: 'Distinct departments', example: 6 },
+            pendingAccess: {
+              type: 'integer',
+              description: 'Employees without an active user login',
+              example: 3,
+            },
+          },
+        },
+        EmployeePageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/EmployeeRegisterSummary' },
+              },
+            },
+          ],
+        },
+        EmployeeAssignment: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            locationType: { type: 'string', enum: ['branch', 'shop', 'warehouse'] },
+            locationTypeLabel: { type: 'string', example: 'Branch' },
+            locationId: objectId,
+            locationName: { type: 'string', example: 'Central Branch' },
+            scope: { type: 'string', enum: ['primary', 'sales', 'stock'] },
+            scopeLabel: { type: 'string', example: 'Primary' },
+            accessRole: { type: 'string', enum: ['branch_manager', 'read_operate', 'read_only'] },
+            accessRoleLabel: { type: 'string', example: 'Branch Manager' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        Employee: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            code: { type: 'string', example: 'EMP-001' },
+            email: { type: 'string', description: 'Work email, stored lowercase. Omitted from the register list.' },
+            phone: { type: 'string' },
+            department: { type: 'string', example: 'Operations' },
+            jobTitle: { type: 'string' },
+            employmentType: { type: 'string', enum: ['full_time', 'part_time', 'contract', 'temporary'] },
+            employmentTypeLabel: { type: 'string', example: 'Full-time' },
+            joiningDate: { type: 'string', format: 'date-time', nullable: true },
+            reportsTo: { type: 'string' },
+            shopAssignment: { type: 'string' },
+            warehouseAccess: { type: 'string' },
+            erpRole: { type: 'string', enum: ['branch_manager', 'staff', 'supervisor', 'manager', 'administrator'] },
+            erpRoleLabel: { type: 'string', example: 'Branch Manager' },
+            createLogin: { type: 'string', description: 'Invitation note. Saving does not create a user login.' },
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            userId: { ...objectId, nullable: true, description: 'Linked login. Empty means access is pending.' },
+            status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
+            statusLabel: { type: 'string', example: 'On leave' },
+            document: {
+              type: 'object',
+              properties: {
+                type: { type: 'string', example: 'Employment contract / ID' },
+                reference: { type: 'string' },
+                fileName: { type: 'string', description: 'PDF, JPG, or PNG. The file bytes are not stored.' },
+              },
+            },
+            notes: { type: 'string' },
+            loginStatus: {
+              type: 'string',
+              enum: ['pending', 'active', 'locked', 'inactive'],
+              description: 'Login status. Separate from employment status.',
+            },
+            loginStatusLabel: { type: 'string', example: 'Invitation pending' },
+            summary: { $ref: '#/components/schemas/EmployeeRegisterSummary' },
+            assignments: {
+              type: 'array',
+              description: 'Location assignments for this employee. Omitted from the register list.',
+              items: { $ref: '#/components/schemas/EmployeeAssignment' },
+            },
+            assignmentsMeta: { $ref: '#/components/schemas/PageMeta' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        EmployeeWrite: {
+          type: 'object',
+          required: ['name', 'code', 'email', 'department', 'jobTitle', 'employmentType', 'branchId', 'erpRole'],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            email: { type: 'string', description: 'Stored lowercase' },
+            phone: { type: 'string' },
+            department: { type: 'string' },
+            jobTitle: { type: 'string' },
+            employmentType: { type: 'string', enum: ['full_time', 'part_time', 'contract', 'temporary'] },
+            joiningDate: { type: 'string', format: 'date', nullable: true },
+            reportsTo: { type: 'string' },
+            branchId: objectId,
+            shopAssignment: { type: 'string' },
+            warehouseAccess: { type: 'string' },
+            erpRole: { type: 'string', enum: ['branch_manager', 'staff', 'supervisor', 'manager', 'administrator'] },
+            createLogin: { type: 'string', description: 'Leave empty to save without an ERP login' },
+            userId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
+            document: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                reference: { type: 'string' },
+                fileName: { type: 'string', description: 'PDF, JPG, or PNG' },
+              },
+            },
+            notes: { type: 'string' },
+            assignments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['locationType', 'locationId', 'scope', 'accessRole'],
+                properties: {
+                  locationType: { type: 'string', enum: ['branch', 'shop', 'warehouse'] },
+                  locationId: objectId,
+                  scope: { type: 'string', enum: ['primary', 'sales', 'stock'] },
+                  accessRole: { type: 'string', enum: ['branch_manager', 'read_operate', 'read_only'] },
+                  status: { type: 'string', enum: ['active', 'inactive'] },
+                },
+              },
+            },
+          },
+        },
+        EmployeeUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string' },
+            email: { type: 'string' },
+            phone: { type: 'string' },
+            department: { type: 'string' },
+            jobTitle: { type: 'string' },
+            employmentType: { type: 'string', enum: ['full_time', 'part_time', 'contract', 'temporary'] },
+            joiningDate: { type: 'string', format: 'date', nullable: true },
+            reportsTo: { type: 'string' },
+            branchId: objectId,
+            shopAssignment: { type: 'string' },
+            warehouseAccess: { type: 'string' },
+            erpRole: { type: 'string', enum: ['branch_manager', 'staff', 'supervisor', 'manager', 'administrator'] },
+            createLogin: { type: 'string' },
+            userId: { ...objectId, nullable: true },
+            status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
+            document: {
+              type: 'object',
+              properties: {
+                type: { type: 'string' },
+                reference: { type: 'string' },
+                fileName: { type: 'string' },
+              },
+            },
+            notes: { type: 'string' },
+            assignments: {
+              type: 'array',
+              items: { type: 'object' },
+            },
+          },
+        },
+        EmployeeStatus: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
           },
         },
         Currency: {

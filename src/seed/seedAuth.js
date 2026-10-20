@@ -7,6 +7,7 @@ import { User } from '../modules/user/user.model.js'
 import { Branch } from '../modules/branch/branch.model.js'
 import { Warehouse } from '../modules/warehouse/warehouse.model.js'
 import { Shop } from '../modules/shop/shop.model.js'
+import { Employee } from '../modules/employee/employee.model.js'
 import { Currency } from '../modules/currency/currency.model.js'
 import { ProductCategory } from '../modules/productCategory/productCategory.model.js'
 import { QuantityUnit } from '../modules/quantityUnit/quantityUnit.model.js'
@@ -20,6 +21,7 @@ const MODULES = [
   'branch',
   'warehouse',
   'shop',
+  'employee',
   'currency',
   'product_category',
   'quantity_unit',
@@ -59,6 +61,7 @@ export async function seedAuth() {
     Branch.init(),
     Warehouse.init(),
     Shop.init(),
+    Employee.init(),
     Currency.init(),
     ProductCategory.init(),
     QuantityUnit.init(),

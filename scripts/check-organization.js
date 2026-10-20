@@ -7,6 +7,7 @@ import { cache } from '../src/common/utils/cache.js'
 import { Branch } from '../src/modules/branch/branch.model.js'
 import { Currency } from '../src/modules/currency/currency.model.js'
 import { Shop } from '../src/modules/shop/shop.model.js'
+import { Employee } from '../src/modules/employee/employee.model.js'
 import { Warehouse } from '../src/modules/warehouse/warehouse.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
@@ -589,7 +590,16 @@ try {
 
   const permissions = await request('GET', '/api/v1/permissions?limit=100', { token: adminToken })
   assertStatus(permissions, 200, 'list permissions')
-  const needed = ['branch.read', 'warehouse.read', 'warehouse.create', 'shop.read', 'shop.create', 'currency.read']
+  const needed = [
+    'branch.read',
+    'warehouse.read',
+    'warehouse.create',
+    'shop.read',
+    'shop.create',
+    'currency.read',
+    'employee.read',
+    'employee.create',
+  ]
   const permissionIds = needed.map((code) => {
     const permission = permissions.json.data.find((item) => item.code === code)
     assert(permission, `${code} is seeded`)
@@ -912,6 +922,285 @@ try {
   await Currency.deleteOne({ _id: cacheCurrency._id })
   cache.delByPrefix('org:currencies')
 
+  const employeeCode = `emp-${Date.now().toString(36)}`
+  const addedEmployee = await request('POST', '/api/v1/employees', {
+    token: adminToken,
+    body: {
+      name: 'Org Employee A',
+      code: employeeCode,
+      email: 'Employee@Gulzar.local',
+      phone: '+1 202 555 0148',
+      department: 'Operations',
+      jobTitle: 'Branch lead',
+      employmentType: 'full_time',
+      joiningDate: '2026-01-01',
+      reportsTo: 'Nadia Saleh',
+      branchId: branchA._id,
+      shopAssignment: 'Org Shop A',
+      warehouseAccess: 'Org Warehouse A',
+      erpRole: 'branch_manager',
+      createLogin: 'Invite by email',
+      status: 'active',
+      userId: null,
+      document: {
+        type: 'Employment contract / ID',
+        reference: 'DOC-2026-001',
+        fileName: 'agreement-or-record.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+      assignments: [
+        { locationType: 'branch', locationId: branchA._id, scope: 'primary', accessRole: 'branch_manager', status: 'active' },
+        { locationType: 'shop', locationId: shopA._id, scope: 'sales', accessRole: 'read_operate', status: 'active' },
+        { locationType: 'warehouse', locationId: warehouseA._id, scope: 'stock', accessRole: 'read_only', status: 'active' },
+      ],
+    },
+  })
+  assertStatus(addedEmployee, 201, 'add employee')
+  assert(addedEmployee.json.data.code === employeeCode.toUpperCase(), 'employee code is stored uppercase')
+  assert(addedEmployee.json.data.email === 'employee@gulzar.local', 'work email is stored lowercase')
+  assert(addedEmployee.json.data.phone === '+1 202 555 0148', 'employee phone is stored')
+  assert(addedEmployee.json.data.jobTitle === 'Branch lead', 'job title is stored')
+  assert(addedEmployee.json.data.employmentType === 'full_time', 'employment type is stored')
+  assert(addedEmployee.json.data.employmentTypeLabel === 'Full-time', 'employment type label is returned')
+  assert(String(addedEmployee.json.data.joiningDate).startsWith('2026-01-01'), 'joining date is stored')
+  assert(addedEmployee.json.data.reportsTo === 'Nadia Saleh', 'reports to is stored')
+  assert(addedEmployee.json.data.shopAssignment === 'Org Shop A', 'shop assignment is stored')
+  assert(addedEmployee.json.data.warehouseAccess === 'Org Warehouse A', 'warehouse access is stored')
+  assert(addedEmployee.json.data.erpRole === 'branch_manager', 'erp role is stored')
+  assert(addedEmployee.json.data.erpRoleLabel === 'Branch Manager', 'erp role label is returned')
+  assert(addedEmployee.json.data.createLogin === 'Invite by email', 'create login is stored')
+  assert(addedEmployee.json.data.userId == null, 'create login does not create a user')
+  assert(addedEmployee.json.data.loginStatusLabel === 'Invitation pending', 'login status label is invitation pending')
+  assert(addedEmployee.json.data.branchId?.name === 'Org Branch A', 'detail includes the primary branch')
+  assert(addedEmployee.json.data.document?.type === 'Employment contract / ID', 'employee document type is stored')
+  assert(addedEmployee.json.data.document?.fileName === 'agreement-or-record.pdf', 'employee document file name is stored')
+  assert(addedEmployee.json.data.notes === 'Add remarks for authorized workspace administrators', 'employee notes are stored')
+  assert(addedEmployee.json.data.statusLabel === 'Active', 'employee status label is Active')
+  assert(addedEmployee.json.data.loginStatus === 'pending', 'employee without a login is pending access')
+  assert(addedEmployee.json.data.assignments.length === 3, 'location assignments are stored')
+  assert(addedEmployee.json.data.assignments[0].locationName === 'Org Branch A', 'branch assignment includes the location name')
+  assert(addedEmployee.json.data.assignments[0].locationTypeLabel === 'Branch', 'branch assignment type label')
+  assert(addedEmployee.json.data.assignments[0].scopeLabel === 'Primary', 'primary scope label')
+  assert(addedEmployee.json.data.assignments[0].accessRoleLabel === 'Branch Manager', 'branch manager role label')
+  assert(addedEmployee.json.data.assignments[1].locationName === 'Org Shop A', 'shop assignment includes the shop name')
+  assert(addedEmployee.json.data.assignments[1].accessRoleLabel === 'Read + operate', 'shop access role label')
+  assert(addedEmployee.json.data.assignments[2].locationName === 'Org Warehouse A', 'warehouse assignment includes the warehouse name')
+  assert(addedEmployee.json.data.assignments[2].scopeLabel === 'Stock', 'stock scope label')
+  assert(addedEmployee.json.data.summary?.employees?.total >= 1, 'employee view includes the cards')
+  assert(addedEmployee.json.data.summary.departments >= 1, 'employee view counts departments')
+  assert(addedEmployee.json.data.summary.pendingAccess >= 1, 'employee view counts pending access')
+  assert(typeof addedEmployee.json.data.createdAt === 'string', 'created on is createdAt')
+
+  const missingEmail = await request('POST', '/api/v1/employees', {
+    token: adminToken,
+    body: {
+      name: 'No Email',
+      code: 'NO-EMP-EMAIL',
+      department: 'Operations',
+      jobTitle: 'Officer',
+      employmentType: 'full_time',
+      erpRole: 'staff',
+      branchId: branchA._id,
+    },
+  })
+  assertStatus(missingEmail, 400, 'work email is required')
+  const badEmployeeFile = await request('POST', '/api/v1/employees', {
+    token: adminToken,
+    body: {
+      name: 'Bad Employee File',
+      code: 'BAD-EMP-FILE',
+      email: 'bad-file@gulzar.local',
+      department: 'Operations',
+      jobTitle: 'Officer',
+      employmentType: 'full_time',
+      erpRole: 'staff',
+      branchId: branchA._id,
+      document: { fileName: 'notes.txt' },
+    },
+  })
+  assertStatus(badEmployeeFile, 400, 'employee file must be pdf or image')
+
+  const employeeRegister = await request('GET', `/api/v1/employees?branchId=${branchA._id}&limit=100`, {
+    token: adminToken,
+  })
+  assertStatus(employeeRegister, 200, 'employee register')
+  const employeeRow = employeeRegister.json.data.find((item) => item.code === employeeCode.toUpperCase())
+  assert(employeeRow?.name === 'Org Employee A', 'employee register includes the name')
+  assert(employeeRow.department === 'Operations', 'employee register includes the department')
+  assert(employeeRow.branchId?.code === 'ORG-A', 'employee register includes the primary branch')
+  assert(employeeRow.status === 'active', 'employee register includes the status')
+  assert(employeeRow.assignments === undefined, 'employee register omits location assignments')
+  assert(employeeRow.email === undefined, 'employee register omits the work email')
+  assert(employeeRegister.json.meta.summary?.employees?.total >= 1, 'employee cards count employees')
+  assert(employeeRegister.json.meta.summary.employees.active >= 1, 'employee cards count active employees')
+  assert(employeeRegister.json.meta.summary.departments >= 1, 'employee cards count departments')
+  assert(employeeRegister.json.meta.summary.pendingAccess >= 1, 'employee cards count pending access')
+
+  const editedEmployee = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Org Employee A',
+      code: employeeCode,
+      email: 'Omar@Example.com',
+      phone: '',
+      department: 'Operations',
+      jobTitle: 'Branch Manager',
+      employmentType: 'full_time',
+      joiningDate: '2026-01-01',
+      reportsTo: 'Amina Rahman',
+      branchId: branchA._id,
+      shopAssignment: 'Central Shop',
+      warehouseAccess: 'Main + Reserve',
+      erpRole: 'branch_manager',
+      createLogin: 'Invite by email',
+      status: 'active',
+      document: {
+        type: 'Employment contract / ID',
+        reference: 'DOC-2026-001',
+        fileName: 'agreement-or-record.pdf',
+      },
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(editedEmployee, 200, 'edit employee')
+  assert(editedEmployee.json.data.email === 'omar@example.com', 'edit stores the work email lowercase')
+  assert(editedEmployee.json.data.phone === '', 'edit stores an empty phone')
+  assert(editedEmployee.json.data.jobTitle === 'Branch Manager', 'edit stores the job title')
+  assert(editedEmployee.json.data.employmentTypeLabel === 'Full-time', 'edit returns the employment type label')
+  assert(String(editedEmployee.json.data.joiningDate).startsWith('2026-01-01'), 'edit stores the joining date')
+  assert(editedEmployee.json.data.reportsTo === 'Amina Rahman', 'edit stores reports to')
+  assert(editedEmployee.json.data.shopAssignment === 'Central Shop', 'edit stores the shop assignment')
+  assert(editedEmployee.json.data.warehouseAccess === 'Main + Reserve', 'edit stores warehouse access')
+  assert(editedEmployee.json.data.erpRoleLabel === 'Branch Manager', 'edit returns the erp role label')
+  assert(editedEmployee.json.data.createLogin === 'Invite by email', 'edit stores create login')
+  assert(editedEmployee.json.data.loginStatusLabel === 'Invitation pending', 'edit leaves the login pending')
+  assert(editedEmployee.json.data.userId == null, 'edit does not create a user')
+  assert(editedEmployee.json.data.document?.reference === 'DOC-2026-001', 'edit stores the document reference')
+  assert(editedEmployee.json.data.document?.fileName === 'agreement-or-record.pdf', 'edit stores the attached file name')
+  assert(editedEmployee.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the employee notes')
+  assert(editedEmployee.json.data.code === employeeCode.toUpperCase(), 'edit stores the code uppercase')
+  assert(parentId(editedEmployee.json.data.branchId) === String(branchA._id), 'edit keeps the primary branch')
+  assert(editedEmployee.json.data.assignments.length === 3, 'edit keeps the location assignments')
+  const keptEmployee = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}`, {
+    token: adminToken,
+    body: { document: { fileName: 'agreement-or-record.pdf' } },
+  })
+  assertStatus(keptEmployee, 200, 'edit without replacing the document fields')
+  assert(keptEmployee.json.data.document?.type === 'Employment contract / ID', 'existing document type stays')
+  assert(keptEmployee.json.data.document?.reference === 'DOC-2026-001', 'existing document reference stays')
+  assert(keptEmployee.json.data.assignments.length === 3, 'assignments stay after a later edit')
+  assert(keptEmployee.json.data.loginStatus === 'pending', 'later edit leaves the login pending')
+  const badEmployeeEditFile = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}`, {
+    token: adminToken,
+    body: { document: { fileName: 'notes.txt' } },
+  })
+  assertStatus(badEmployeeEditFile, 400, 'edit employee rejects a file that is not pdf or image')
+
+  const otherBranchEmployee = await request('POST', '/api/v1/employees', {
+    token: adminToken,
+    body: {
+      name: 'North Employee',
+      code: `emp-b-${Date.now().toString(36)}`,
+      email: `north-${Date.now().toString(36)}@gulzar.local`,
+      department: 'Management',
+      jobTitle: 'Manager',
+      employmentType: 'full_time',
+      erpRole: 'supervisor',
+      branchId: branchB._id,
+      status: 'active',
+    },
+  })
+  assertStatus(otherBranchEmployee, 201, 'employee on branch B')
+
+  const onLeave = await request('PATCH', `/api/v1/employees/${addedEmployee.json.data._id}/status`, {
+    token: adminToken,
+    body: { status: 'on_leave' },
+  })
+  assertStatus(onLeave, 200, 'set employee on leave')
+  assert(onLeave.json.data.status === 'on_leave', 'employment status is on leave')
+  assert(onLeave.json.data.statusLabel === 'On leave', 'on leave label is returned')
+  assert(onLeave.json.data.loginStatus === 'pending', 'on leave leaves the login pending')
+  assert(onLeave.json.data.assignments.length === 3, 'on leave keeps location assignments')
+  const leaveList = await request('GET', '/api/v1/employees?status=on_leave&limit=100', { token: adminToken })
+  assertStatus(leaveList, 200, 'filter employees on leave')
+  assert(leaveList.json.data.some((item) => item.code === employeeCode.toUpperCase()), 'on leave filter includes the employee')
+  assert(leaveList.json.data.every((item) => item.status === 'on_leave'), 'on leave filter returns on leave rows')
+  assert(leaveList.json.meta.summary.employees.active >= 1, 'status filter leaves the active card in place')
+
+  const pagedAssignments = await request(
+    'GET',
+    `/api/v1/employees/${addedEmployee.json.data._id}?page=1&limit=2`,
+    { token: adminToken },
+  )
+  assertStatus(pagedAssignments, 200, 'paged location assignments')
+  assert(pagedAssignments.json.data.assignments.length === 2, 'assignment page returns the limit')
+  assert(pagedAssignments.json.data.assignmentsMeta?.total === 3, 'assignment table total stays 3')
+
+  const missingLocation = await request('POST', '/api/v1/employees', {
+    token: adminToken,
+    body: {
+      name: 'Missing Location',
+      code: `emp-miss-${Date.now().toString(36)}`,
+      email: `miss-${Date.now().toString(36)}@gulzar.local`,
+      department: 'Operations',
+      jobTitle: 'Officer',
+      employmentType: 'contract',
+      erpRole: 'staff',
+      branchId: branchA._id,
+      assignments: [
+        { locationType: 'warehouse', locationId: MISSING_ID, scope: 'stock', accessRole: 'read_only' },
+      ],
+    },
+  })
+  assertStatus(missingLocation, 400, 'unknown assignment location')
+  assert(missingLocation.json.errors?.[0]?.field === 'assignments.0.locationId', 'unknown location field')
+
+  const scopedEmployees = await request('GET', '/api/v1/employees?limit=100', { token: limitedToken })
+  assertStatus(scopedEmployees, 200, 'scoped employees')
+  assert(
+    scopedEmployees.json.data.every((item) => parentId(item.branchId) === String(branchA._id)),
+    'limited user only sees employees of branch A',
+  )
+  const hiddenEmployee = await request('GET', `/api/v1/employees/${otherBranchEmployee.json.data._id}`, {
+    token: limitedToken,
+  })
+  assertStatus(hiddenEmployee, 404, 'branch B employee is hidden')
+  const foreignEmployee = await request('POST', '/api/v1/employees', {
+    token: limitedToken,
+    body: {
+      name: 'Foreign Employee',
+      code: `emp-foreign-${Date.now().toString(36)}`,
+      email: `foreign-${Date.now().toString(36)}@gulzar.local`,
+      department: 'Sales',
+      jobTitle: 'Officer',
+      employmentType: 'part_time',
+      erpRole: 'staff',
+      branchId: branchB._id,
+    },
+  })
+  assertStatus(foreignEmployee, 403, 'create employee on branch B')
+  const outsideAssignment = await request('POST', '/api/v1/employees', {
+    token: limitedToken,
+    body: {
+      name: 'Outside Assignment',
+      code: `emp-out-${Date.now().toString(36)}`,
+      email: `out-${Date.now().toString(36)}@gulzar.local`,
+      department: 'Warehouse',
+      jobTitle: 'Officer',
+      employmentType: 'temporary',
+      erpRole: 'staff',
+      branchId: branchA._id,
+      assignments: [
+        { locationType: 'warehouse', locationId: warehouseB._id, scope: 'stock', accessRole: 'read_only' },
+      ],
+    },
+  })
+  assertStatus(outsideAssignment, 400, 'assignment outside the caller branches')
+  assert(outsideAssignment.json.errors?.[0]?.field === 'assignments.0.locationId', 'outside assignment field')
+
+  await Employee.deleteOne({ _id: addedEmployee.json.data._id })
+  await Employee.deleteOne({ _id: otherBranchEmployee.json.data._id })
+
   const specRes = await request('GET', '/openapi.json')
   assertStatus(specRes, 200, 'openapi')
   const requiredPaths = [
@@ -924,6 +1213,9 @@ try {
     '/api/v1/shops',
     '/api/v1/shops/{id}',
     '/api/v1/shops/{id}/status',
+    '/api/v1/employees',
+    '/api/v1/employees/{id}',
+    '/api/v1/employees/{id}/status',
     '/api/v1/currencies',
     '/api/v1/currencies/{id}',
     '/api/v1/currencies/{id}/status',
