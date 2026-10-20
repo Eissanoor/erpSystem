@@ -4,6 +4,7 @@ import { permissionPaths } from './paths/permissions.js'
 import { rolePaths } from './paths/roles.js'
 import { shopPaths } from './paths/shops.js'
 import { employeePaths } from './paths/employees.js'
+import { ownerPaths } from './paths/owners.js'
 import { userPaths } from './paths/users.js'
 import { warehousePaths } from './paths/warehouses.js'
 import { currencyPaths } from './paths/currencies.js'
@@ -35,6 +36,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Warehouses', description: 'Inventory locations under a branch' },
       { name: 'Shops', description: 'Sales locations under a branch' },
       { name: 'Employees', description: 'Employee profiles, departments, and location assignments' },
+      { name: 'Owners', description: 'Owner identities, ownership shares, and capital interests' },
       { name: 'Currencies', description: 'Global currency master' },
       { name: 'Product categories', description: 'Product classification tree' },
       { name: 'Quantity units', description: 'Base measurement units' },
@@ -66,6 +68,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...warehousePaths,
       ...shopPaths,
       ...employeePaths,
+      ...ownerPaths,
       ...currencyPaths,
       ...productCategoryPaths,
       ...quantityUnitPaths,
@@ -838,6 +841,167 @@ export function buildOpenApiSpec(serverUrl = '/') {
           required: ['status'],
           properties: {
             status: { type: 'string', enum: ['active', 'on_leave', 'inactive'] },
+          },
+        },
+        OwnerRegisterSummary: {
+          type: 'object',
+          properties: {
+            owners: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 2 },
+                active: { type: 'integer', example: 2 },
+              },
+            },
+            ownershipAllocated: {
+              type: 'string',
+              description: 'Sum of active owners’ ownershipPercentage. 100 means 100%.',
+              example: '100',
+            },
+            capitalPledged: {
+              type: 'string',
+              description: 'Sum of the latest committed amount on each active owner.',
+              example: '10000000',
+            },
+          },
+        },
+        OwnerPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/OwnerRegisterSummary' },
+              },
+            },
+          ],
+        },
+        OwnerInterest: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            entity: { type: 'string', example: 'Central Trading' },
+            share: { type: 'string', description: 'Share percent as a decimal string', example: '60' },
+            committed: { type: 'string', example: '6000000' },
+            paidIn: { type: 'string', example: '4500000' },
+            effectiveDate: { type: 'string', format: 'date-time' },
+          },
+        },
+        OwnerAllocation: {
+          type: 'object',
+          description: 'Total allocated row for the ownership and capital interests table.',
+          properties: {
+            entity: { type: 'string', example: 'Total allocated' },
+            share: { type: 'string', example: '100' },
+            committed: { type: 'string', example: '10000000' },
+            paidIn: { type: 'string', example: '7500000' },
+            effectiveDate: { type: 'string', nullable: true },
+            effectiveLabel: { type: 'string', example: 'Current' },
+          },
+        },
+        Owner: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Amina Rahman' },
+            code: { type: 'string', example: 'OWN-001' },
+            ownerType: { type: 'string', enum: ['individual', 'corporate'] },
+            ownerTypeLabel: { type: 'string', example: 'Individual' },
+            identityNo: { type: 'string', description: 'Identity or registration number. Omitted from the register list.' },
+            email: { type: 'string', description: 'Stored lowercase. Omitted from the register list.' },
+            phone: { type: 'string', description: 'Omitted from the register list.' },
+            address: { type: 'string', description: 'Omitted from the register list.' },
+            countryOfRegistration: { type: 'string', description: 'Omitted from the register list.' },
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            ownershipPercentage: { type: 'string', description: 'Ownership share. 60 means 60%.', example: '60' },
+            capitalCommitment: { type: 'string', description: 'Capital commitment. Omitted from the register list.', example: '6000000' },
+            effectiveDate: { type: 'string', format: 'date-time', description: 'Effective date of the current share.' },
+            capitalAccount: { type: 'string', description: 'Capital account name entered on the form.' },
+            capitalAccountId: {
+              ...objectId,
+              nullable: true,
+              description: 'Empty until a capital account record exists.',
+            },
+            authorizedSignatory: { type: 'string' },
+            notes: { type: 'string', description: 'Internal notes. Omitted from the register list.' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            statusLabel: { type: 'string', example: 'Active' },
+            summary: { $ref: '#/components/schemas/OwnerRegisterSummary' },
+            interests: {
+              type: 'array',
+              description: 'Ownership and capital interests. Newest effective date first. Omitted from the register list.',
+              items: { $ref: '#/components/schemas/OwnerInterest' },
+            },
+            interestsMeta: { $ref: '#/components/schemas/PageMeta' },
+            allocation: { $ref: '#/components/schemas/OwnerAllocation' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        OwnerWrite: {
+          type: 'object',
+          required: ['name', 'code', 'ownerType', 'email', 'ownershipPercentage', 'effectiveDate', 'branchId'],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            ownerType: { type: 'string', enum: ['individual', 'corporate'] },
+            identityNo: { type: 'string' },
+            email: { type: 'string', description: 'Stored lowercase' },
+            phone: { type: 'string' },
+            address: { type: 'string' },
+            countryOfRegistration: { type: 'string' },
+            branchId: objectId,
+            ownershipPercentage: { type: 'string', description: '0 to 100, for example 60' },
+            capitalCommitment: { type: 'string', description: 'Capital commitment, for example 6000000' },
+            effectiveDate: { type: 'string', format: 'date' },
+            capitalAccount: { type: 'string', description: 'Capital account name' },
+            authorizedSignatory: { type: 'string' },
+            notes: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            interests: {
+              type: 'array',
+              description: 'Optional history rows. Omit them to store the form share, commitment, and effective date as the first row.',
+              items: {
+                type: 'object',
+                required: ['entity', 'share', 'committed', 'paidIn', 'effectiveDate'],
+                properties: {
+                  entity: { type: 'string' },
+                  share: { type: 'string' },
+                  committed: { type: 'string' },
+                  paidIn: { type: 'string' },
+                  effectiveDate: { type: 'string', format: 'date' },
+                },
+              },
+            },
+          },
+        },
+        OwnerUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string' },
+            ownerType: { type: 'string', enum: ['individual', 'corporate'] },
+            identityNo: { type: 'string' },
+            email: { type: 'string' },
+            phone: { type: 'string' },
+            address: { type: 'string' },
+            countryOfRegistration: { type: 'string' },
+            branchId: objectId,
+            ownershipPercentage: { type: 'string' },
+            capitalCommitment: { type: 'string' },
+            effectiveDate: { type: 'string', format: 'date' },
+            capitalAccount: { type: 'string' },
+            authorizedSignatory: { type: 'string' },
+            notes: { type: 'string' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            interests: { type: 'array', items: { type: 'object' } },
+          },
+        },
+        OwnerStatus: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string', enum: ['active', 'inactive'] },
           },
         },
         Currency: {

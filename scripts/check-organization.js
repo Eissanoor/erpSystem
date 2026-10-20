@@ -8,6 +8,7 @@ import { Branch } from '../src/modules/branch/branch.model.js'
 import { Currency } from '../src/modules/currency/currency.model.js'
 import { Shop } from '../src/modules/shop/shop.model.js'
 import { Employee } from '../src/modules/employee/employee.model.js'
+import { Owner } from '../src/modules/owner/owner.model.js'
 import { Warehouse } from '../src/modules/warehouse/warehouse.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
@@ -535,6 +536,8 @@ try {
     'currency.read',
     'employee.read',
     'employee.create',
+    'owner.read',
+    'owner.create',
   ]
   const permissionIds = needed.map((code) => {
     const permission = permissions.json.data.find((item) => item.code === code)
@@ -1098,6 +1101,324 @@ try {
   await Employee.deleteOne({ _id: addedEmployee.json.data._id })
   await Employee.deleteOne({ _id: otherBranchEmployee.json.data._id })
 
+  const ownerStamp = Date.now().toString(36)
+  const beforeOwners = await request('GET', '/api/v1/owners?limit=100', { token: adminToken })
+  assertStatus(beforeOwners, 200, 'owner register before create')
+  const amina = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'Amina Rahman',
+      code: `own-a-${ownerStamp}`,
+      ownerType: 'individual',
+      identityNo: 'REG-10012',
+      email: 'Amina@Gulzar.local',
+      phone: '+1 202 555 0148',
+      address: '18 Commerce Avenue',
+      countryOfRegistration: 'Pakistan',
+      branchId: branchA._id,
+      ownershipPercentage: '60',
+      capitalCommitment: '6000000',
+      effectiveDate: '2026-01-01',
+      capitalAccount: 'Owner capital',
+      authorizedSignatory: 'Amina Rahman',
+      notes: 'Add remarks for authorized workspace administrators',
+      status: 'active',
+      interests: [
+        {
+          entity: 'Central Trading',
+          share: '50',
+          committed: '5000000',
+          paidIn: '4000000',
+          effectiveDate: '2025-01-01',
+        },
+        {
+          entity: 'Central Trading',
+          share: '60',
+          committed: '6000000',
+          paidIn: '4500000',
+          effectiveDate: '2026-01-01',
+        },
+      ],
+    },
+  })
+  assertStatus(amina, 201, 'add owner')
+  assert(amina.json.data.code === `OWN-A-${ownerStamp}`.toUpperCase(), 'owner code is stored uppercase')
+  assert(amina.json.data.ownerType === 'individual', 'owner type is stored')
+  assert(amina.json.data.ownerTypeLabel === 'Individual', 'owner type label is Individual')
+  assert(amina.json.data.ownershipPercentage === '60', 'ownership percentage is stored')
+  assert(amina.json.data.identityNo === 'REG-10012', 'identity number is stored')
+  assert(amina.json.data.email === 'amina@gulzar.local', 'owner email is stored lowercase')
+  assert(amina.json.data.phone === '+1 202 555 0148', 'owner phone is stored')
+  assert(amina.json.data.address === '18 Commerce Avenue', 'owner address is stored')
+  assert(amina.json.data.countryOfRegistration === 'Pakistan', 'country of registration is stored')
+  assert(amina.json.data.capitalCommitment === '6000000', 'capital commitment is stored')
+  assert(String(amina.json.data.effectiveDate).startsWith('2026-01-01'), 'owner effective date is stored')
+  assert(amina.json.data.capitalAccount === 'Owner capital', 'capital account name is stored')
+  assert(amina.json.data.capitalAccountId === null, 'capital account id stays empty')
+  assert(amina.json.data.authorizedSignatory === 'Amina Rahman', 'authorized signatory is stored')
+  assert(amina.json.data.notes === 'Add remarks for authorized workspace administrators', 'owner notes are stored')
+  assert(amina.json.data.statusLabel === 'Active', 'owner status label is Active')
+  assert(amina.json.data.branchId?.name === 'Org Branch A', 'owner detail includes the branch')
+  assert(amina.json.data.interests.length === 2, 'ownership interests are stored')
+  assert(amina.json.data.interests[0].entity === 'Central Trading', 'newest interest is first')
+  assert(amina.json.data.interests[0].share === '60', 'current share is stored')
+  assert(amina.json.data.interests[0].committed === '6000000', 'committed capital is stored')
+  assert(amina.json.data.interests[0].paidIn === '4500000', 'paid in capital is stored')
+  assert(String(amina.json.data.interests[0].effectiveDate).startsWith('2026-01-01'), 'effective date is stored')
+  assert(amina.json.data.allocation?.entity === 'Total allocated', 'allocation row is named Total allocated')
+  assert(amina.json.data.allocation.effectiveLabel === 'Current', 'allocation date label is Current')
+  assert(amina.json.data.allocation.effectiveDate === null, 'allocation has no effective date')
+  assert(typeof amina.json.data.createdAt === 'string', 'created on is createdAt')
+  assert(typeof amina.json.data.updatedAt === 'string', 'updated is updatedAt')
+  assert(amina.json.data.summary?.owners?.total >= 1, 'owner view includes the cards')
+
+  const khalid = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'Khalid Trading Ltd',
+      code: `own-b-${ownerStamp}`,
+      ownerType: 'corporate',
+      email: `khalid-${ownerStamp}@gulzar.local`,
+      branchId: branchA._id,
+      ownershipPercentage: '40',
+      capitalCommitment: '4000000',
+      effectiveDate: '2026-01-01',
+      status: 'active',
+    },
+  })
+  assertStatus(khalid, 201, 'add corporate owner')
+  assert(khalid.json.data.ownerTypeLabel === 'Corporate', 'corporate type label')
+  assert(khalid.json.data.interests.length === 1, 'form save stores the opening capital record')
+  assert(khalid.json.data.interests[0].share === '40', 'opening record uses the ownership share')
+  assert(khalid.json.data.interests[0].committed === '4000000', 'opening record uses the capital commitment')
+  assert(khalid.json.data.interests[0].paidIn === '0', 'opening record paid in starts at zero')
+  assert(String(khalid.json.data.interests[0].effectiveDate).startsWith('2026-01-01'), 'opening record uses the effective date')
+
+  const ownerRegister = await request('GET', `/api/v1/owners?branchId=${branchA._id}&limit=100`, {
+    token: adminToken,
+  })
+  assertStatus(ownerRegister, 200, 'owner register')
+  const ownerRow = ownerRegister.json.data.find((item) => item.code === `OWN-A-${ownerStamp}`.toUpperCase())
+  assert(ownerRow?.name === 'Amina Rahman', 'owner register includes the name')
+  assert(ownerRow.ownerTypeLabel === 'Individual', 'owner register includes the type')
+  assert(ownerRow.ownershipPercentage === '60', 'owner register includes the share')
+  assert(ownerRow.status === 'active', 'owner register includes the status')
+  assert(ownerRow.interests === undefined, 'owner register omits capital interests')
+  assert(ownerRow.phone === undefined, 'owner register omits the phone')
+  assert(ownerRow.email === undefined, 'owner register omits the email')
+  assert(ownerRow.notes === undefined, 'owner register omits the notes')
+  assert(ownerRow.allocation === undefined, 'owner register omits the total row')
+  const beforeShare = Number(beforeOwners.json.meta.summary.ownershipAllocated)
+  const beforePledged = Number(beforeOwners.json.meta.summary.capitalPledged)
+  assert(
+    Number(ownerRegister.json.meta.summary.ownershipAllocated) - beforeShare === 100,
+    'ownership allocated adds the active shares',
+  )
+  assert(
+    Number(ownerRegister.json.meta.summary.capitalPledged) - beforePledged === 10000000,
+    'capital pledged uses the latest committed amount',
+  )
+  assert(ownerRegister.json.meta.summary.owners.total >= 2, 'owner cards count owners')
+  assert(ownerRegister.json.meta.summary.owners.active >= 2, 'owner cards count active owners')
+  assert(
+    ownerRegister.json.meta.summary.ownershipAllocated === amina.json.data.allocation.share ||
+      Number(ownerRegister.json.meta.summary.ownershipAllocated) >= 100,
+    'register share card is present',
+  )
+
+  const searched = await request('GET', `/api/v1/owners?search=${encodeURIComponent(`own-a-${ownerStamp}`)}&limit=20`, {
+    token: adminToken,
+  })
+  assertStatus(searched, 200, 'search owners')
+  assert(searched.json.data.length === 1, 'search matches the owner code')
+  assert(
+    searched.json.meta.summary.ownershipAllocated === ownerRegister.json.meta.summary.ownershipAllocated,
+    'search leaves the ownership card in place',
+  )
+  const inactiveOwners = await request('GET', '/api/v1/owners?status=inactive&limit=100', { token: adminToken })
+  assertStatus(inactiveOwners, 200, 'filter inactive owners')
+  assert(
+    inactiveOwners.json.meta.summary.owners.active === ownerRegister.json.meta.summary.owners.active,
+    'status filter leaves the active card in place',
+  )
+  assert(
+    inactiveOwners.json.meta.summary.capitalPledged === ownerRegister.json.meta.summary.capitalPledged,
+    'status filter leaves capital pledged in place',
+  )
+
+  const pagedInterests = await request(
+    'GET',
+    `/api/v1/owners/${amina.json.data._id}?page=1&limit=1`,
+    { token: adminToken },
+  )
+  assertStatus(pagedInterests, 200, 'owner detail')
+  assert(pagedInterests.json.data.name === 'Amina Rahman', 'detail returns the owner name')
+  assert(pagedInterests.json.data.ownerTypeLabel === 'Individual', 'detail returns the owner type')
+  assert(pagedInterests.json.data.email === 'amina@gulzar.local', 'detail returns the email')
+  assert(pagedInterests.json.data.address === '18 Commerce Avenue', 'detail returns the address')
+  assert(pagedInterests.json.data.countryOfRegistration === 'Pakistan', 'detail returns the country')
+  assert(pagedInterests.json.data.ownershipPercentage === '60', 'detail returns the ownership share')
+  assert(pagedInterests.json.data.capitalCommitment === '6000000', 'detail returns the capital commitment')
+  assert(String(pagedInterests.json.data.effectiveDate).startsWith('2026-01-01'), 'detail returns the effective date')
+  assert(pagedInterests.json.data.capitalAccount === 'Owner capital', 'detail returns the capital account')
+  assert(pagedInterests.json.data.authorizedSignatory === 'Amina Rahman', 'detail returns the authorized signatory')
+  assert(pagedInterests.json.data.statusLabel === 'Active', 'detail returns the record status')
+  assert(pagedInterests.json.data.summary?.owners?.total >= 2, 'detail includes the owner cards')
+  assert(pagedInterests.json.data.interests[0].entity === 'Central Trading', 'detail interest includes the entity')
+  assert(pagedInterests.json.data.interests.length === 1, 'interest page returns the limit')
+  assert(pagedInterests.json.data.interestsMeta?.total === 2, 'interest table total stays 2')
+  assert(
+    pagedInterests.json.data.allocation.committed === ownerRegister.json.meta.summary.capitalPledged,
+    'total allocated committed matches capital pledged',
+  )
+  assert(pagedInterests.json.data.allocation.paidIn, 'total allocated includes paid in')
+
+  const keptOwner = await request('PATCH', `/api/v1/owners/${amina.json.data._id}`, {
+    token: adminToken,
+    body: { name: 'Amina Rahman' },
+  })
+  assertStatus(keptOwner, 200, 'edit keeps the owner')
+  assert(keptOwner.json.data.interests.length === 2, 'interests stay when omitted')
+  assert(keptOwner.json.data.ownershipPercentage === '60', 'share stays when omitted')
+
+  const editedOwner = await request('PATCH', `/api/v1/owners/${amina.json.data._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Amina Rahman',
+      code: `own-a-${ownerStamp}`,
+      ownerType: 'individual',
+      identityNo: '',
+      email: 'Amina@Example.com',
+      phone: '',
+      address: 'City Center',
+      countryOfRegistration: 'Pakistan',
+      ownershipPercentage: '55',
+      capitalCommitment: '7000000',
+      effectiveDate: '2026-06-01',
+      capitalAccount: 'Owner capital — Amina',
+      authorizedSignatory: 'Yes',
+      status: 'active',
+      notes: 'Add remarks for authorized workspace administrators',
+    },
+  })
+  assertStatus(editedOwner, 200, 'edit owner')
+  assert(editedOwner.json.data.code === `OWN-A-${ownerStamp}`.toUpperCase(), 'edit stores the code uppercase')
+  assert(editedOwner.json.data.email === 'amina@example.com', 'edit stores the email lowercase')
+  assert(editedOwner.json.data.phone === '', 'edit stores an empty phone')
+  assert(editedOwner.json.data.address === 'City Center', 'edit stores the address')
+  assert(editedOwner.json.data.countryOfRegistration === 'Pakistan', 'edit stores the country')
+  assert(editedOwner.json.data.ownerTypeLabel === 'Individual', 'edit returns the owner type')
+  assert(editedOwner.json.data.ownershipPercentage === '55', 'edit stores the ownership share')
+  assert(editedOwner.json.data.capitalCommitment === '7000000', 'edit stores the capital commitment')
+  assert(String(editedOwner.json.data.effectiveDate).startsWith('2026-06-01'), 'edit stores the effective date')
+  assert(editedOwner.json.data.capitalAccount === 'Owner capital — Amina', 'edit stores the capital account')
+  assert(editedOwner.json.data.authorizedSignatory === 'Yes', 'edit stores the authorized signatory')
+  assert(editedOwner.json.data.statusLabel === 'Active', 'edit returns the record status')
+  assert(editedOwner.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the notes')
+  assert(editedOwner.json.data.interests.length === 3, 'edit keeps the earlier capital rows')
+  assert(editedOwner.json.data.interests[0].share === '55', 'newest capital row uses the edited share')
+  assert(editedOwner.json.data.interests[0].committed === '7000000', 'newest capital row uses the edited commitment')
+  assert(editedOwner.json.data.interests[0].entity === 'Central Trading', 'newest capital row keeps the entity')
+  assert(editedOwner.json.data.interests[0].paidIn === '4500000', 'newest capital row keeps the paid in amount')
+  assert(
+    editedOwner.json.data.interests.some((row) => String(row.effectiveDate).startsWith('2026-01-01')),
+    'the earlier effective date stays',
+  )
+  const sameShare = await request('PATCH', `/api/v1/owners/${amina.json.data._id}`, {
+    token: adminToken,
+    body: {
+      ownershipPercentage: '55',
+      capitalCommitment: '7000000',
+      effectiveDate: '2026-06-01',
+    },
+  })
+  assertStatus(sameShare, 200, 'edit with the same share')
+  assert(sameShare.json.data.interests.length === 3, 'an unchanged share does not add another capital row')
+
+  const missingOwnerEmail = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'No Email',
+      code: `own-no-email-${ownerStamp}`,
+      ownerType: 'individual',
+      branchId: branchA._id,
+      ownershipPercentage: '10',
+      effectiveDate: '2026-01-01',
+    },
+  })
+  assertStatus(missingOwnerEmail, 400, 'owner email is required')
+  const tooMuch = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'Too Much',
+      code: `own-over-${ownerStamp}`,
+      ownerType: 'individual',
+      email: `over-${ownerStamp}@gulzar.local`,
+      branchId: branchA._id,
+      ownershipPercentage: '150',
+      effectiveDate: '2026-01-01',
+    },
+  })
+  assertStatus(tooMuch, 400, 'ownership percentage cannot exceed 100')
+  const unknownOwnerBranch = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'Missing Branch',
+      code: `own-miss-${ownerStamp}`,
+      ownerType: 'individual',
+      email: `miss-${ownerStamp}@gulzar.local`,
+      branchId: MISSING_ID,
+      ownershipPercentage: '10',
+      effectiveDate: '2026-01-01',
+    },
+  })
+  assertStatus(unknownOwnerBranch, 400, 'unknown branch on owner')
+  const ownerDropdown = await request('GET', '/api/v1/owners?status=active&page=1&limit=20', { token: adminToken })
+  assertStatus(ownerDropdown, 200, 'owner dropdown')
+  assert(ownerDropdown.json.meta.summary === undefined, 'owner dropdown omits the cards')
+
+  const otherBranchOwner = await request('POST', '/api/v1/owners', {
+    token: adminToken,
+    body: {
+      name: 'North Owner',
+      code: `own-c-${ownerStamp}`,
+      ownerType: 'individual',
+      email: `north-${ownerStamp}@gulzar.local`,
+      branchId: branchB._id,
+      ownershipPercentage: '10',
+      effectiveDate: '2026-01-01',
+      status: 'active',
+    },
+  })
+  assertStatus(otherBranchOwner, 201, 'owner on branch B')
+  const scopedOwners = await request('GET', '/api/v1/owners?limit=100', { token: limitedToken })
+  assertStatus(scopedOwners, 200, 'scoped owners')
+  assert(
+    scopedOwners.json.data.every((item) => parentId(item.branchId) === String(branchA._id)),
+    'limited user only sees owners of branch A',
+  )
+  const hiddenOwner = await request('GET', `/api/v1/owners/${otherBranchOwner.json.data._id}`, {
+    token: limitedToken,
+  })
+  assertStatus(hiddenOwner, 404, 'branch B owner is hidden')
+  const foreignOwner = await request('POST', '/api/v1/owners', {
+    token: limitedToken,
+    body: {
+      name: 'Foreign Owner',
+      code: `own-foreign-${ownerStamp}`,
+      ownerType: 'corporate',
+      email: `foreign-${ownerStamp}@gulzar.local`,
+      branchId: branchB._id,
+      ownershipPercentage: '5',
+      effectiveDate: '2026-01-01',
+    },
+  })
+  assertStatus(foreignOwner, 403, 'create owner on branch B')
+
+  await Owner.deleteOne({ _id: amina.json.data._id })
+  await Owner.deleteOne({ _id: khalid.json.data._id })
+  await Owner.deleteOne({ _id: otherBranchOwner.json.data._id })
+
   const specRes = await request('GET', '/openapi.json')
   assertStatus(specRes, 200, 'openapi')
   const requiredPaths = [
@@ -1113,6 +1434,9 @@ try {
     '/api/v1/employees',
     '/api/v1/employees/{id}',
     '/api/v1/employees/{id}/status',
+    '/api/v1/owners',
+    '/api/v1/owners/{id}',
+    '/api/v1/owners/{id}/status',
     '/api/v1/currencies',
     '/api/v1/currencies/{id}',
     '/api/v1/currencies/{id}/status',
