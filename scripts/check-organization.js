@@ -9,6 +9,7 @@ import { Currency } from '../src/modules/currency/currency.model.js'
 import { Shop } from '../src/modules/shop/shop.model.js'
 import { Employee } from '../src/modules/employee/employee.model.js'
 import { Owner } from '../src/modules/owner/owner.model.js'
+import { Partnership } from '../src/modules/partnership/partnership.model.js'
 import { Warehouse } from '../src/modules/warehouse/warehouse.model.js'
 
 const LIMITED_EMAIL = 'org.limited@gulzar.local'
@@ -538,6 +539,8 @@ try {
     'employee.create',
     'owner.read',
     'owner.create',
+    'partnership.read',
+    'partnership.create',
   ]
   const permissionIds = needed.map((code) => {
     const permission = permissions.json.data.find((item) => item.code === code)
@@ -1415,6 +1418,329 @@ try {
   })
   assertStatus(foreignOwner, 403, 'create owner on branch B')
 
+  const partnerRows = (firstShare, secondShare, firstContribution, secondContribution) => [
+    {
+      ownerId: amina.json.data._id,
+      contribution: firstContribution,
+      ownership: firstShare,
+      profitShare: firstShare,
+      lossShare: firstShare,
+    },
+    {
+      ownerId: khalid.json.data._id,
+      contribution: secondContribution,
+      ownership: secondShare,
+      profitShare: secondShare,
+      lossShare: secondShare,
+    },
+  ]
+  const beforePartnerships = await request('GET', '/api/v1/partnerships?limit=100', { token: adminToken })
+  assertStatus(beforePartnerships, 200, 'partnership register before create')
+  const central = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'Central Trading Partnership',
+      code: `pt-a-${ownerStamp}`,
+      agreementType: 'operating_partnership',
+      branchId: branchA._id,
+      effectiveDate: '2026-01-01',
+      reviewDate: '2026-12-31',
+      capitalCommitment: '10000000',
+      settlementFrequency: 'Monthly',
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman, Khalid Trading Ltd',
+      profitAllocation: 'By ownership share',
+      lossAllocation: 'By ownership share',
+      approvalAuthority: 'Managing partner',
+      notes: 'Add remarks for authorized workspace administrators',
+      status: 'active',
+      partners: partnerRows('60', '40', '6000000', '4000000'),
+    },
+  })
+  assertStatus(central, 201, 'add partnership')
+  assert(central.json.data.code === `PT-A-${ownerStamp}`.toUpperCase(), 'partnership code is stored uppercase')
+  assert(central.json.data.agreementTypeLabel === 'Operating partnership', 'agreement type label is returned')
+  assert(String(central.json.data.effectiveDate).startsWith('2026-01-01'), 'effective date is stored')
+  assert(String(central.json.data.startDate).startsWith('2026-01-01'), 'start date matches the effective date')
+  assert(String(central.json.data.reviewDate).startsWith('2026-12-31'), 'end or review date is stored')
+  assert(central.json.data.capitalCommitment === '10000000', 'capital commitment is stored')
+  assert(central.json.data.settlementFrequency === 'Monthly', 'settlement frequency is stored')
+  assert(central.json.data.managingPartner === 'Amina Rahman', 'managing partner is stored')
+  assert(central.json.data.partnerRoster === 'Amina Rahman, Khalid Trading Ltd', 'partner roster is stored')
+  assert(central.json.data.profitAllocation === 'By ownership share', 'profit allocation is stored')
+  assert(central.json.data.lossAllocation === 'By ownership share', 'loss allocation is stored')
+  assert(central.json.data.approvalAuthority === 'Managing partner', 'approval authority is stored')
+  assert(central.json.data.notes === 'Add remarks for authorized workspace administrators', 'partnership notes are stored')
+  assert(central.json.data.statusLabel === 'Active', 'partnership status label is Active')
+  assert(central.json.data.partners.length === 2, 'partners are stored')
+  assert(central.json.data.partners[0].partnerName === 'Amina Rahman', 'partner name comes from the owner')
+  assert(central.json.data.partners[0].contribution === '6000000', 'partner contribution is stored')
+  assert(central.json.data.partners[0].ownership === '60', 'ownership share is stored')
+  assert(central.json.data.partners[0].profitShare === '60', 'profit share is stored')
+  assert(central.json.data.partners[0].lossShare === '60', 'loss share is stored')
+  assert(central.json.data.partners[1].partnerName === 'Khalid Trading Ltd', 'second partner name is returned')
+  assert(central.json.data.allocation?.partner === 'Total', 'allocation row is named Total')
+  assert(central.json.data.allocation.contribution === '10000000', 'total contribution is the sum')
+  assert(central.json.data.allocation.ownership === '100', 'total ownership is 100')
+  assert(central.json.data.allocation.profitShare === '100', 'total profit share is 100')
+  assert(central.json.data.allocation.lossShare === '100', 'total loss share is 100')
+  assert(typeof central.json.data.createdAt === 'string', 'created on is createdAt')
+  assert(typeof central.json.data.updatedAt === 'string', 'updated is updatedAt')
+
+  const north = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'North Distribution JV',
+      code: `pt-b-${ownerStamp}`,
+      agreementType: 'distribution_venture',
+      effectiveDate: '2026-03-15',
+      branchId: branchA._id,
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman, Khalid Trading Ltd',
+      profitAllocation: 'By ownership share',
+      lossAllocation: 'By ownership share',
+      status: 'active',
+      partners: partnerRows('70', '30', '7000000', '3000000'),
+    },
+  })
+  assertStatus(north, 201, 'add distribution venture')
+  assert(north.json.data.agreementTypeLabel === 'Distribution venture', 'distribution venture label')
+  const airport = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'Airport Retail Agreement',
+      code: `pt-c-${ownerStamp}`,
+      agreementType: 'retail_partnership',
+      effectiveDate: '2026-06-01',
+      branchId: branchA._id,
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman, Khalid Trading Ltd',
+      profitAllocation: 'By ownership share',
+      lossAllocation: 'By ownership share',
+      status: 'draft',
+      partners: partnerRows('50', '50', '1000000', '1000000'),
+    },
+  })
+  assertStatus(airport, 201, 'add draft partnership')
+  assert(airport.json.data.statusLabel === 'Draft', 'draft status label')
+  assert(airport.json.data.agreementTypeLabel === 'Retail partnership', 'retail partnership label')
+
+  const partnershipRegister = await request('GET', `/api/v1/partnerships?branchId=${branchA._id}&limit=100`, {
+    token: adminToken,
+  })
+  assertStatus(partnershipRegister, 200, 'partnership register')
+  const partnershipRow = partnershipRegister.json.data.find(
+    (item) => item.code === `PT-A-${ownerStamp}`.toUpperCase(),
+  )
+  assert(partnershipRow?.name === 'Central Trading Partnership', 'register includes the partnership name')
+  assert(partnershipRow.agreementTypeLabel === 'Operating partnership', 'register includes the agreement type')
+  assert(String(partnershipRow.startDate).startsWith('2026-01-01'), 'register includes the start date')
+  assert(partnershipRow.status === 'active', 'register includes the status')
+  assert(partnershipRow.partners === undefined, 'register omits partners')
+  assert(partnershipRow.managingPartner === undefined, 'register omits the managing partner')
+  assert(partnershipRow.notes === undefined, 'register omits the notes')
+  const beforeSummary = beforePartnerships.json.meta.summary
+  const afterSummary = partnershipRegister.json.meta.summary
+  assert(afterSummary.agreements.total - beforeSummary.agreements.total === 3, 'agreements card counts the new rows')
+  assert(afterSummary.agreements.active - beforeSummary.agreements.active === 2, 'active card counts active agreements')
+  assert(afterSummary.reviewDue - beforeSummary.reviewDue === 1, 'review due counts draft agreements')
+  assert(afterSummary.activePartners - beforeSummary.activePartners === 4, 'active partners counts rows on active agreements')
+
+  const searchedPartnership = await request(
+    'GET',
+    `/api/v1/partnerships?search=${encodeURIComponent(`pt-a-${ownerStamp}`)}&limit=20`,
+    { token: adminToken },
+  )
+  assertStatus(searchedPartnership, 200, 'search partnerships')
+  assert(searchedPartnership.json.data.length === 1, 'search matches the partnership code')
+  assert(
+    searchedPartnership.json.meta.summary.reviewDue === afterSummary.reviewDue,
+    'search leaves the review due card in place',
+  )
+  const draftPartnerships = await request('GET', '/api/v1/partnerships?status=draft&limit=100', { token: adminToken })
+  assertStatus(draftPartnerships, 200, 'filter draft partnerships')
+  assert(
+    draftPartnerships.json.meta.summary.agreements.active === afterSummary.agreements.active,
+    'status filter leaves the active card in place',
+  )
+
+  const pagedPartners = await request(
+    'GET',
+    `/api/v1/partnerships/${central.json.data._id}?page=1&limit=1`,
+    { token: adminToken },
+  )
+  assertStatus(pagedPartners, 200, 'partnership detail')
+  assert(pagedPartners.json.data.name === 'Central Trading Partnership', 'detail returns the partnership name')
+  assert(pagedPartners.json.data.agreementTypeLabel === 'Operating partnership', 'detail returns the agreement type')
+  assert(pagedPartners.json.data.branchId?.name === 'Org Branch A', 'detail returns the responsible branch')
+  assert(String(pagedPartners.json.data.effectiveDate).startsWith('2026-01-01'), 'detail returns the effective date')
+  assert(String(pagedPartners.json.data.reviewDate).startsWith('2026-12-31'), 'detail returns the end or review date')
+  assert(pagedPartners.json.data.capitalCommitment === '10000000', 'detail returns the capital commitment')
+  assert(pagedPartners.json.data.settlementFrequency === 'Monthly', 'detail returns the settlement frequency')
+  assert(pagedPartners.json.data.managingPartner === 'Amina Rahman', 'detail returns the managing partner')
+  assert(pagedPartners.json.data.partnerRoster === 'Amina Rahman, Khalid Trading Ltd', 'detail returns the partner roster')
+  assert(pagedPartners.json.data.profitAllocation === 'By ownership share', 'detail returns the profit allocation')
+  assert(pagedPartners.json.data.lossAllocation === 'By ownership share', 'detail returns the loss allocation')
+  assert(pagedPartners.json.data.approvalAuthority === 'Managing partner', 'detail returns the approval authority')
+  assert(pagedPartners.json.data.statusLabel === 'Active', 'detail returns the record status')
+  assert(pagedPartners.json.data.summary?.agreements?.total >= 3, 'detail includes the agreement cards')
+  assert(pagedPartners.json.data.partners[0].partnerName === 'Amina Rahman', 'detail partner includes the owner name')
+  assert(pagedPartners.json.data.partners.length === 1, 'partner page returns the limit')
+  assert(pagedPartners.json.data.partnersMeta?.total === 2, 'partner table total stays 2')
+  assert(pagedPartners.json.data.allocation.contribution === '10000000', 'detail total includes every partner')
+  const keptPartnership = await request('PATCH', `/api/v1/partnerships/${central.json.data._id}`, {
+    token: adminToken,
+    body: { name: 'Central Trading Partnership' },
+  })
+  assertStatus(keptPartnership, 200, 'edit keeps the partnership')
+  assert(keptPartnership.json.data.partners.length === 2, 'partners stay when omitted')
+
+  const editedPartnership = await request('PATCH', `/api/v1/partnerships/${central.json.data._id}`, {
+    token: adminToken,
+    body: {
+      name: 'Central Trading Partnership',
+      code: `pt-a-${ownerStamp}`,
+      agreementType: 'operating_partnership',
+      branchId: branchA._id,
+      effectiveDate: '2026-01-01',
+      reviewDate: '2026-12-31',
+      capitalCommitment: '10000000',
+      settlementFrequency: 'Quarterly',
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina + Khalid Trading',
+      profitAllocation: '60% / 40%',
+      lossAllocation: '60% / 40%',
+      approvalAuthority: 'Both partners',
+      status: 'active',
+      notes: 'Add remarks for authorized workspace administrators',
+      partners: partnerRows('60', '40', '6000000', '4000000'),
+    },
+  })
+  assertStatus(editedPartnership, 200, 'edit partnership')
+  assert(editedPartnership.json.data.code === `PT-A-${ownerStamp}`.toUpperCase(), 'edit stores the code uppercase')
+  assert(editedPartnership.json.data.agreementTypeLabel === 'Operating partnership', 'edit returns the agreement type')
+  assert(parentId(editedPartnership.json.data.branchId) === String(branchA._id), 'edit keeps the responsible branch')
+  assert(String(editedPartnership.json.data.effectiveDate).startsWith('2026-01-01'), 'edit stores the effective date')
+  assert(String(editedPartnership.json.data.reviewDate).startsWith('2026-12-31'), 'edit stores the end or review date')
+  assert(editedPartnership.json.data.capitalCommitment === '10000000', 'edit stores the capital commitment')
+  assert(editedPartnership.json.data.settlementFrequency === 'Quarterly', 'edit stores the settlement frequency')
+  assert(editedPartnership.json.data.managingPartner === 'Amina Rahman', 'edit stores the managing partner')
+  assert(editedPartnership.json.data.partnerRoster === 'Amina + Khalid Trading', 'edit stores the partner roster')
+  assert(editedPartnership.json.data.profitAllocation === '60% / 40%', 'edit stores the profit allocation')
+  assert(editedPartnership.json.data.lossAllocation === '60% / 40%', 'edit stores the loss allocation')
+  assert(editedPartnership.json.data.approvalAuthority === 'Both partners', 'edit stores the approval authority')
+  assert(editedPartnership.json.data.statusLabel === 'Active', 'edit returns the record status')
+  assert(editedPartnership.json.data.notes === 'Add remarks for authorized workspace administrators', 'edit stores the notes')
+  assert(editedPartnership.json.data.partners.length === 2, 'edit stores the partner table')
+  assert(editedPartnership.json.data.allocation.ownership === '100', 'edited partner ownership still totals 100')
+  assert(editedPartnership.json.data.allocation.profitShare === '100', 'edited profit share still totals 100')
+  assert(editedPartnership.json.data.allocation.lossShare === '100', 'edited loss share still totals 100')
+
+  const uneven = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'Uneven',
+      code: `pt-bad-${ownerStamp}`,
+      agreementType: 'operating_partnership',
+      effectiveDate: '2026-01-01',
+      branchId: branchA._id,
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman, Khalid Trading Ltd',
+      profitAllocation: 'By ownership share',
+      lossAllocation: 'By ownership share',
+      status: 'active',
+      partners: partnerRows('70', '20', '1', '1'),
+    },
+  })
+  assertStatus(uneven, 400, 'allocation columns must total 100')
+  const missingPartner = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'Missing Partner',
+      code: `pt-miss-${ownerStamp}`,
+      agreementType: 'operating_partnership',
+      effectiveDate: '2026-01-01',
+      branchId: branchA._id,
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman',
+      profitAllocation: 'Sole',
+      lossAllocation: 'Sole',
+      partners: [
+        {
+          ownerId: MISSING_ID,
+          contribution: '100',
+          ownership: '100',
+          profitShare: '100',
+          lossShare: '100',
+        },
+      ],
+    },
+  })
+  assertStatus(missingPartner, 400, 'unknown partner')
+  assert(missingPartner.json.errors?.[0]?.field === 'partners.0.ownerId', 'unknown partner field')
+  const partnershipDropdown = await request('GET', '/api/v1/partnerships?status=active&page=1&limit=20', {
+    token: adminToken,
+  })
+  assertStatus(partnershipDropdown, 200, 'partnership dropdown')
+  assert(partnershipDropdown.json.meta.summary === undefined, 'partnership dropdown omits the cards')
+
+  const otherBranchPartnership = await request('POST', '/api/v1/partnerships', {
+    token: adminToken,
+    body: {
+      name: 'North Only',
+      code: `pt-d-${ownerStamp}`,
+      agreementType: 'retail_partnership',
+      effectiveDate: '2026-02-01',
+      branchId: branchB._id,
+      managingPartner: 'North Owner',
+      partnerRoster: 'North Owner',
+      profitAllocation: 'Sole',
+      lossAllocation: 'Sole',
+      status: 'active',
+      partners: [
+        {
+          ownerId: otherBranchOwner.json.data._id,
+          contribution: '500000',
+          ownership: '100',
+          profitShare: '100',
+          lossShare: '100',
+        },
+      ],
+    },
+  })
+  assertStatus(otherBranchPartnership, 201, 'partnership on branch B')
+  const scopedPartnerships = await request('GET', '/api/v1/partnerships?limit=100', { token: limitedToken })
+  assertStatus(scopedPartnerships, 200, 'scoped partnerships')
+  assert(
+    scopedPartnerships.json.data.every((item) => parentId(item.branchId) === String(branchA._id)),
+    'limited user only sees partnerships of branch A',
+  )
+  const hiddenPartnership = await request('GET', `/api/v1/partnerships/${otherBranchPartnership.json.data._id}`, {
+    token: limitedToken,
+  })
+  assertStatus(hiddenPartnership, 404, 'branch B partnership is hidden')
+  const foreignPartnership = await request('POST', '/api/v1/partnerships', {
+    token: limitedToken,
+    body: {
+      name: 'Foreign Partnership',
+      code: `pt-foreign-${ownerStamp}`,
+      agreementType: 'operating_partnership',
+      effectiveDate: '2026-01-01',
+      branchId: branchB._id,
+      managingPartner: 'Amina Rahman',
+      partnerRoster: 'Amina Rahman, Khalid Trading Ltd',
+      profitAllocation: 'By ownership share',
+      lossAllocation: 'By ownership share',
+      partners: partnerRows('60', '40', '1', '1'),
+    },
+  })
+  assertStatus(foreignPartnership, 403, 'create partnership on branch B')
+
+  await Partnership.deleteOne({ _id: central.json.data._id })
+  await Partnership.deleteOne({ _id: north.json.data._id })
+  await Partnership.deleteOne({ _id: airport.json.data._id })
+  await Partnership.deleteOne({ _id: otherBranchPartnership.json.data._id })
+
   await Owner.deleteOne({ _id: amina.json.data._id })
   await Owner.deleteOne({ _id: khalid.json.data._id })
   await Owner.deleteOne({ _id: otherBranchOwner.json.data._id })
@@ -1437,6 +1763,9 @@ try {
     '/api/v1/owners',
     '/api/v1/owners/{id}',
     '/api/v1/owners/{id}/status',
+    '/api/v1/partnerships',
+    '/api/v1/partnerships/{id}',
+    '/api/v1/partnerships/{id}/status',
     '/api/v1/currencies',
     '/api/v1/currencies/{id}',
     '/api/v1/currencies/{id}/status',

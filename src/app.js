@@ -21,6 +21,7 @@ import { warehouseRouter } from './modules/warehouse/warehouse.routes.js'
 import { shopRouter } from './modules/shop/shop.routes.js'
 import { employeeRouter } from './modules/employee/employee.routes.js'
 import { ownerRouter } from './modules/owner/owner.routes.js'
+import { partnershipRouter } from './modules/partnership/partnership.routes.js'
 import { currencyRouter } from './modules/currency/currency.routes.js'
 import { productCategoryRouter } from './modules/productCategory/productCategory.routes.js'
 import { quantityUnitRouter } from './modules/quantityUnit/quantityUnit.routes.js'
@@ -101,6 +102,7 @@ export function createApp() {
   app.use('/api/v1/shops', shopRouter)
   app.use('/api/v1/employees', employeeRouter)
   app.use('/api/v1/owners', ownerRouter)
+  app.use('/api/v1/partnerships', partnershipRouter)
   app.use('/api/v1/currencies', currencyRouter)
   app.use('/api/v1/product-categories', productCategoryRouter)
   app.use('/api/v1/quantity-units', quantityUnitRouter)

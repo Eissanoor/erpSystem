@@ -5,6 +5,7 @@ import { rolePaths } from './paths/roles.js'
 import { shopPaths } from './paths/shops.js'
 import { employeePaths } from './paths/employees.js'
 import { ownerPaths } from './paths/owners.js'
+import { partnershipPaths } from './paths/partnerships.js'
 import { userPaths } from './paths/users.js'
 import { warehousePaths } from './paths/warehouses.js'
 import { currencyPaths } from './paths/currencies.js'
@@ -37,6 +38,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Shops', description: 'Sales locations under a branch' },
       { name: 'Employees', description: 'Employee profiles, departments, and location assignments' },
       { name: 'Owners', description: 'Owner identities, ownership shares, and capital interests' },
+      { name: 'Partnerships', description: 'Partnership agreements, partners, and allocations' },
       { name: 'Currencies', description: 'Global currency master' },
       { name: 'Product categories', description: 'Product classification tree' },
       { name: 'Quantity units', description: 'Base measurement units' },
@@ -69,6 +71,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...shopPaths,
       ...employeePaths,
       ...ownerPaths,
+      ...partnershipPaths,
       ...currencyPaths,
       ...productCategoryPaths,
       ...quantityUnitPaths,
@@ -1002,6 +1005,175 @@ export function buildOpenApiSpec(serverUrl = '/') {
           required: ['status'],
           properties: {
             status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        PartnershipRegisterSummary: {
+          type: 'object',
+          properties: {
+            agreements: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', example: 3 },
+                active: { type: 'integer', example: 2 },
+              },
+            },
+            reviewDue: { type: 'integer', description: 'Draft agreements', example: 1 },
+            activePartners: {
+              type: 'integer',
+              description: 'Partner rows on active agreements',
+              example: 4,
+            },
+          },
+        },
+        PartnershipPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/PartnershipRegisterSummary' },
+              },
+            },
+          ],
+        },
+        PartnershipPartner: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            ownerId: objectId,
+            partnerName: { type: 'string', example: 'Amina Rahman' },
+            contribution: { type: 'string', example: '6000000' },
+            ownership: { type: 'string', description: '60 means 60%', example: '60' },
+            profitShare: { type: 'string', example: '60' },
+            lossShare: { type: 'string', example: '60' },
+          },
+        },
+        PartnershipAllocation: {
+          type: 'object',
+          description: 'Total row for the partners and allocations table.',
+          properties: {
+            partner: { type: 'string', example: 'Total' },
+            contribution: { type: 'string', example: '10000000' },
+            ownership: { type: 'string', example: '100' },
+            profitShare: { type: 'string', example: '100' },
+            lossShare: { type: 'string', example: '100' },
+          },
+        },
+        Partnership: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Central Trading Partnership' },
+            code: { type: 'string', example: 'PT-001' },
+            agreementType: {
+              type: 'string',
+              enum: ['operating_partnership', 'distribution_venture', 'retail_partnership'],
+            },
+            agreementTypeLabel: { type: 'string', example: 'Operating partnership' },
+            effectiveDate: { type: 'string', format: 'date-time', description: 'Effective date. Also returned as startDate for the register.' },
+            startDate: { type: 'string', format: 'date-time', description: 'Same value as effectiveDate. Shown as Start date on the register.' },
+            reviewDate: { type: 'string', format: 'date-time', nullable: true, description: 'End or review date. Omitted from the register list.' },
+            capitalCommitment: { type: 'string', description: 'Agreement capital commitment. Omitted from the register list.', example: '10000000' },
+            settlementFrequency: { type: 'string', description: 'Omitted from the register list.' },
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            managingPartner: { type: 'string', description: 'Omitted from the register list.' },
+            partnerRoster: { type: 'string', description: 'Omitted from the register list.' },
+            profitAllocation: { type: 'string', description: 'Agreement profit allocation text. Omitted from the register list.' },
+            lossAllocation: { type: 'string', description: 'Agreement loss allocation text. Omitted from the register list.' },
+            approvalAuthority: { type: 'string', description: 'Omitted from the register list.' },
+            notes: { type: 'string', description: 'Internal notes. Omitted from the register list.' },
+            status: { type: 'string', enum: ['draft', 'active', 'inactive'] },
+            statusLabel: { type: 'string', example: 'Active' },
+            summary: { $ref: '#/components/schemas/PartnershipRegisterSummary' },
+            partners: {
+              type: 'array',
+              description: 'Partners and allocations. Omitted from the register list.',
+              items: { $ref: '#/components/schemas/PartnershipPartner' },
+            },
+            partnersMeta: { $ref: '#/components/schemas/PageMeta' },
+            allocation: { $ref: '#/components/schemas/PartnershipAllocation' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        PartnershipWrite: {
+          type: 'object',
+          required: [
+            'name',
+            'code',
+            'agreementType',
+            'branchId',
+            'effectiveDate',
+            'managingPartner',
+            'partnerRoster',
+            'profitAllocation',
+            'lossAllocation',
+            'partners',
+          ],
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string', description: 'Stored uppercase' },
+            agreementType: {
+              type: 'string',
+              enum: ['operating_partnership', 'distribution_venture', 'retail_partnership'],
+            },
+            branchId: objectId,
+            effectiveDate: { type: 'string', format: 'date' },
+            reviewDate: { type: 'string', format: 'date', nullable: true },
+            capitalCommitment: { type: 'string' },
+            settlementFrequency: { type: 'string' },
+            managingPartner: { type: 'string' },
+            partnerRoster: { type: 'string' },
+            profitAllocation: { type: 'string' },
+            lossAllocation: { type: 'string' },
+            approvalAuthority: { type: 'string' },
+            notes: { type: 'string' },
+            status: { type: 'string', enum: ['draft', 'active', 'inactive'] },
+            partners: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['ownerId', 'contribution', 'ownership', 'profitShare', 'lossShare'],
+                properties: {
+                  ownerId: objectId,
+                  contribution: { type: 'string' },
+                  ownership: { type: 'string' },
+                  profitShare: { type: 'string' },
+                  lossShare: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        PartnershipUpdate: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            code: { type: 'string' },
+            agreementType: {
+              type: 'string',
+              enum: ['operating_partnership', 'distribution_venture', 'retail_partnership'],
+            },
+            effectiveDate: { type: 'string', format: 'date' },
+            reviewDate: { type: 'string', format: 'date', nullable: true },
+            capitalCommitment: { type: 'string' },
+            settlementFrequency: { type: 'string' },
+            branchId: objectId,
+            managingPartner: { type: 'string' },
+            partnerRoster: { type: 'string' },
+            profitAllocation: { type: 'string' },
+            lossAllocation: { type: 'string' },
+            approvalAuthority: { type: 'string' },
+            notes: { type: 'string' },
+            status: { type: 'string', enum: ['draft', 'active', 'inactive'] },
+            partners: { type: 'array', items: { type: 'object' } },
+          },
+        },
+        PartnershipStatus: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { type: 'string', enum: ['draft', 'active', 'inactive'] },
           },
         },
         Currency: {
