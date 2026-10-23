@@ -21,6 +21,13 @@ import { ProductDamage } from '../modules/inventory/productDamage.model.js'
 import { StockAdjustment } from '../modules/inventory/stockAdjustment.model.js'
 import { InventoryItem } from '../modules/inventory/inventoryItem.model.js'
 import { WarehouseTransfer } from '../modules/inventory/warehouseTransfer.model.js'
+import { Supplier } from '../modules/supplier/supplier.model.js'
+import { SupplierInvoice } from '../modules/payables/supplierInvoice.model.js'
+import { SupplierPayment } from '../modules/payables/supplierPayment.model.js'
+import { SupplierLedgerEntry } from '../modules/payables/supplierLedgerEntry.model.js'
+import { Purchase } from '../modules/purchase/purchase.model.js'
+import { PurchaseItem } from '../modules/purchase/purchaseItem.model.js'
+import { PurchaseReturn } from '../modules/purchase/purchaseReturn.model.js'
 
 const MODULES = [
   'user',
@@ -39,6 +46,16 @@ const MODULES = [
   'product',
   'stock',
   'transfer',
+  'adjustment',
+  'damage',
+  'supplier',
+  'customer',
+  'payable',
+  'receivable',
+  'purchase',
+  'purchase_return',
+  'sale',
+  'sale_return',
 ]
 const ACTIONS = ['create', 'read', 'update']
 
@@ -64,6 +81,76 @@ export const SEEDED_PERMISSIONS = [
     action: 'approve',
     code: 'transfer.approve',
     description: 'Dispatch and receive warehouse transfers',
+    status: 'active',
+  },
+  {
+    module: 'adjustment',
+    action: 'approve',
+    code: 'adjustment.approve',
+    description: 'Approve or reject stock adjustments',
+    status: 'active',
+  },
+  {
+    module: 'damage',
+    action: 'approve',
+    code: 'damage.approve',
+    description: 'Approve or reject product damage reports',
+    status: 'active',
+  },
+  {
+    module: 'purchase',
+    action: 'approve',
+    code: 'purchase.approve',
+    description: 'Approve purchase orders',
+    status: 'active',
+  },
+  {
+    module: 'purchase',
+    action: 'post',
+    code: 'purchase.post',
+    description: 'Post purchases to payables',
+    status: 'active',
+  },
+  {
+    module: 'purchase_return',
+    action: 'approve',
+    code: 'purchase_return.approve',
+    description: 'Approve purchase returns for posting',
+    status: 'active',
+  },
+  {
+    module: 'purchase_return',
+    action: 'post',
+    code: 'purchase_return.post',
+    description: 'Post purchase returns to stock and payables',
+    status: 'active',
+  },
+  {
+    module: 'sale',
+    action: 'approve',
+    code: 'sale.approve',
+    description: 'Approve sales for posting',
+    status: 'active',
+  },
+  {
+    module: 'sale',
+    action: 'post',
+    code: 'sale.post',
+    description: 'Post sales to stock and receivables',
+    status: 'active',
+  },
+  {
+    module: 'sale_return',
+    action: 'approve',
+    code: 'sale_return.approve',
+    description: 'Approve sales returns for posting',
+    status: 'active',
+  },
+  {
+    module: 'sale_return',
+    action: 'post',
+    code: 'sale_return.post',
+    description: 'Post sales returns to stock and receivables',
     status: 'active',
   },
 ]
@@ -94,6 +181,13 @@ export async function seedAuth() {
     StockAdjustment.init(),
     InventoryItem.init(),
     WarehouseTransfer.init(),
+    Supplier.init(),
+    SupplierInvoice.init(),
+    SupplierPayment.init(),
+    SupplierLedgerEntry.init(),
+    Purchase.init(),
+    PurchaseItem.init(),
+    PurchaseReturn.init(),
   ])
 
   await Permission.bulkWrite(

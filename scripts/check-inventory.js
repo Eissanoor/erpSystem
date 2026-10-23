@@ -216,12 +216,17 @@ try {
     damageNumber: `DMG-INV-${stamp}`,
     branchId,
     warehouseId: mainWh.json.data._id,
-    productId: coffee.json.data._id,
     damageType: 'broken',
-    quantity: mongoose.Types.Decimal128.fromString('82'),
-    unitCost: mongoose.Types.Decimal128.fromString('79.0243902439'),
+    reason: 'Card seed',
     status: 'draft',
     damageDate: now,
+    lines: [
+      {
+        productId: coffee.json.data._id,
+        quantity: mongoose.Types.Decimal128.fromString('82'),
+        unitCost: mongoose.Types.Decimal128.fromString('79.0243902439'),
+      },
+    ],
   })
 
   await StockAdjustment.create({
@@ -230,11 +235,12 @@ try {
     warehouseId: mainWh.json.data._id,
     status: 'draft',
     adjustmentDate: now,
-    lines: Array.from({ length: 14 }, (_, index) => ({
+    lines: Array.from({ length: 14 }, () => ({
       productId: coffee.json.data._id,
       systemQuantity: mongoose.Types.Decimal128.fromString('1'),
       actualQuantity: mongoose.Types.Decimal128.fromString('0'),
       difference: mongoose.Types.Decimal128.fromString('-1'),
+      unitCost: mongoose.Types.Decimal128.fromString('12.40'),
     })),
   })
 
@@ -643,6 +649,257 @@ try {
     'list includes the transfer',
   )
 
+  assert(login.json.data.user.permissionCodes.includes('adjustment.approve'), 'admin can approve adjustments')
+  await StockBalance.findOneAndUpdate(
+    {
+      warehouseId: mainWh.json.data._id,
+      productId: coffee.json.data._id,
+      inventoryItemId: null,
+    },
+    {
+      $set: {
+        quantity: mongoose.Types.Decimal128.fromString('18'),
+        reservedQuantity: mongoose.Types.Decimal128.fromString('0'),
+      },
+    },
+    { upsert: true },
+  )
+  await StockBalance.findOneAndUpdate(
+    {
+      warehouseId: mainWh.json.data._id,
+      productId: milk.json.data._id,
+      inventoryItemId: null,
+    },
+    {
+      $set: {
+        quantity: mongoose.Types.Decimal128.fromString('86'),
+        reservedQuantity: mongoose.Types.Decimal128.fromString('0'),
+      },
+    },
+    { upsert: true },
+  )
+
+  const draftAdj = await request('POST', '/api/v1/adjustments', {
+    token,
+    body: {
+      warehouseId: mainWh.json.data._id,
+      reason: 'Cycle count variance',
+      countReference: `COUNT-${stamp}`,
+      countNote: 'Coffee shortage confirmed by second count; four loose carry bags found in packing area.',
+      requestedApproverId: adminId,
+      lines: [
+        { productId: coffee.json.data._id, actualQuantity: '16', unitCost: '12.40' },
+        { productId: milk.json.data._id, actualQuantity: '90', unitCost: '0.18' },
+      ],
+    },
+  })
+  assertStatus(draftAdj, 201, 'create adjustment')
+  assert(draftAdj.json.data.statusLabel === 'Draft', 'new adjustment is draft')
+  const coffeeLine = draftAdj.json.data.lines.find((row) => row.sku === `BEV-${stamp}`.toUpperCase())
+  assert(coffeeLine.systemQuantity === '18', 'system qty comes from the stock balance')
+  assert(coffeeLine.actualQuantity === '16', 'actual qty is stored')
+  assert(coffeeLine.difference === '-2', 'difference is actual minus system')
+  assert(coffeeLine.valueImpact === '-24.8' || coffeeLine.valueImpact === '-24.80', 'value impact is difference times cost')
+  assert(draftAdj.json.data.summary.productsCounted === 2, 'products counted')
+  assert(draftAdj.json.data.summary.productsWithVariance === 2, 'products with variance')
+  assert(draftAdj.json.data.summary.stockOutOnApproval === '2', 'stock-out on approval')
+  assert(draftAdj.json.data.summary.stockInOnApproval === '4', 'stock-in on approval')
+  assert(draftAdj.json.data.stockUnchanged === true, 'draft does not change stock')
+  assert(draftAdj.json.data.history.some((row) => /Created draft/i.test(row.action)), 'history starts with create')
+
+  const approveDraft = await request('POST', `/api/v1/adjustments/${draftAdj.json.data._id}/approve`, { token })
+  assertStatus(approveDraft, 400, 'approve draft rejected')
+
+  const submitted = await request('POST', `/api/v1/adjustments/${draftAdj.json.data._id}/submit`, { token })
+  assertStatus(submitted, 200, 'submit adjustment')
+  assert(submitted.json.data.statusLabel === 'Pending', 'submitted adjustment is pending')
+  assert(submitted.json.data.workflow.pending.current === true, 'workflow highlights pending')
+  assert(submitted.json.data.stockUnchanged === true, 'pending does not change stock')
+  assert(
+    submitted.json.data.history.some((row) => /Submitted for approval/i.test(row.action)),
+    'history records submit',
+  )
+
+  const beforeCoffee = await StockBalance.findOne({
+    warehouseId: mainWh.json.data._id,
+    productId: coffee.json.data._id,
+    inventoryItemId: null,
+  }).lean()
+  assert(String(beforeCoffee.quantity) === '18', 'stock stays at system qty while pending')
+
+  const approved = await request('POST', `/api/v1/adjustments/${draftAdj.json.data._id}/approve`, { token })
+  assertStatus(approved, 200, 'approve adjustment')
+  assert(approved.json.data.statusLabel === 'Approved', 'approved status')
+  assert(approved.json.data.approver?.name, 'approver is stored')
+  assert(approved.json.data.movementNumbers.length === 2, 'approval creates movements for variances')
+  assert(approved.json.data.stockUnchanged === false, 'approved document has moved stock')
+
+  const afterCoffee = await StockBalance.findOne({
+    warehouseId: mainWh.json.data._id,
+    productId: coffee.json.data._id,
+    inventoryItemId: null,
+  }).lean()
+  assert(String(afterCoffee.quantity) === '16', 'approval reduces coffee by the shortage')
+  const afterMilk = await StockBalance.findOne({
+    warehouseId: mainWh.json.data._id,
+    productId: milk.json.data._id,
+    inventoryItemId: null,
+  }).lean()
+  assert(String(afterMilk.quantity) === '90', 'approval increases milk by the surplus')
+
+  const doubleApprove = await request('POST', `/api/v1/adjustments/${draftAdj.json.data._id}/approve`, { token })
+  assertStatus(doubleApprove, 400, 'double approve rejected')
+
+  const rejectSeed = await request('POST', '/api/v1/adjustments', {
+    token,
+    body: {
+      warehouseId: mainWh.json.data._id,
+      reason: 'Reject me',
+      lines: [{ productId: coffee.json.data._id, actualQuantity: '16', unitCost: '12.40' }],
+    },
+  })
+  assertStatus(rejectSeed, 201, 'create adjustment to reject')
+  await request('POST', `/api/v1/adjustments/${rejectSeed.json.data._id}/submit`, { token })
+  const rejected = await request('POST', `/api/v1/adjustments/${rejectSeed.json.data._id}/reject`, {
+    token,
+    body: { note: 'Recount required' },
+  })
+  assertStatus(rejected, 200, 'reject adjustment')
+  assert(rejected.json.data.statusLabel === 'Rejected', 'rejected status')
+  assert(rejected.json.data.movementNumbers.length === 0, 'reject creates no movements')
+  assert(rejected.json.data.history.some((row) => /Rejected/i.test(row.action)), 'history records reject')
+
+  const adjDetail = await request('GET', `/api/v1/adjustments/${approved.json.data._id}`, { token })
+  assertStatus(adjDetail, 200, 'adjustment detail')
+  assert(adjDetail.json.data.countReference === `COUNT-${stamp}`.toUpperCase(), 'detail keeps count reference')
+  assert(String(adjDetail.json.data.requestedApprover?._id) === String(adminId), 'detail keeps requested approver')
+
+  const listedAdj = await request('GET', `/api/v1/adjustments?warehouseId=${mainWh.json.data._id}&limit=20`, {
+    token,
+  })
+  assertStatus(listedAdj, 200, 'adjustment list')
+  assert(
+    listedAdj.json.data.some((row) => row.adjustmentNumber === approved.json.data.adjustmentNumber),
+    'list includes the approved adjustment',
+  )
+
+  const draftDmg = await request('POST', '/api/v1/damages', {
+    token,
+    body: {
+      warehouseId: mainWh.json.data._id,
+      damageType: 'leaked',
+      reason: 'Broken',
+      requestedApproverId: adminId,
+      lines: [{ productId: coffee.json.data._id, quantity: '3', unitCost: '7.65' }],
+    },
+  })
+  assertStatus(draftDmg, 201, 'create damage')
+  assert(draftDmg.json.data.statusLabel === 'Draft', 'new damage is draft')
+  assert(draftDmg.json.data.damageTypeLabel === 'Leaked', 'damage type label')
+  assert(draftDmg.json.data.summary.affectedQuantity === '3', 'affected quantity')
+  assert(draftDmg.json.data.summary.currentStock === '16', 'current stock before damage approval')
+  assert(draftDmg.json.data.summary.inventoryLoss === '22.95', 'inventory loss')
+  assert(draftDmg.json.data.impactPreview.stockAfterApproval === '13', 'stock after approval preview')
+  assert(draftDmg.json.data.impactPreview.journal.enabled === true, 'journal preview enabled')
+  assert(draftDmg.json.data.impactPreview.journal.lines.length === 2, 'balanced journal has two lines')
+  assert(draftDmg.json.data.impactPreview.selfApprovalAllowed === false, 'self-approval flag')
+  assert(draftDmg.json.data.stockUnchanged === true, 'draft does not change stock')
+  assert(draftDmg.json.data.accountingPosted === false, 'no voucher while draft')
+  assert(draftDmg.json.data.voucherNumber === '', 'voucher empty while draft')
+  assert(draftDmg.json.data.workflow.draft.current === true, 'workflow highlights draft')
+  assert(draftDmg.json.data.history.some((row) => /Created draft/i.test(row.action)), 'history starts with create')
+
+  const saveDraft = await request('PATCH', `/api/v1/damages/${draftDmg.json.data._id}`, {
+    token,
+    body: { reason: 'Seal failure on pallet' },
+  })
+  assertStatus(saveDraft, 200, 'save draft damage')
+  assert(saveDraft.json.data.reason === 'Seal failure on pallet', 'reason updated')
+
+  const approveDraftDmg = await request('POST', `/api/v1/damages/${draftDmg.json.data._id}/approve`, { token })
+  assertStatus(approveDraftDmg, 400, 'approve draft damage rejected')
+
+  const submittedDmg = await request('POST', `/api/v1/damages/${draftDmg.json.data._id}/submit`, { token })
+  assertStatus(submittedDmg, 200, 'submit damage')
+  assert(submittedDmg.json.data.statusLabel === 'Pending', 'submitted damage is pending')
+  assert(submittedDmg.json.data.workflow.pending.current === true, 'workflow highlights pending')
+  assert(submittedDmg.json.data.stockUnchanged === true, 'pending does not change stock')
+
+  const beforeDmgCoffee = await StockBalance.findOne({
+    warehouseId: mainWh.json.data._id,
+    productId: coffee.json.data._id,
+    inventoryItemId: null,
+  }).lean()
+  assert(String(beforeDmgCoffee.quantity) === '16', 'stock stays while damage is pending')
+
+  const approvedDmg = await request('POST', `/api/v1/damages/${draftDmg.json.data._id}/approve`, { token })
+  assertStatus(approvedDmg, 200, 'approve damage')
+  assert(approvedDmg.json.data.statusLabel === 'Approved', 'approved damage status')
+  assert(approvedDmg.json.data.approver?.name, 'approver is stored')
+  assert(approvedDmg.json.data.movementNumbers.length === 1, 'approval creates one damage movement')
+  assert(approvedDmg.json.data.stockUnchanged === false, 'approved damage has moved stock')
+  assert(approvedDmg.json.data.accountingPosted === false, 'accounting voucher still pending')
+  assert(approvedDmg.json.data.voucherNumber === '', 'voucher number empty until accounting service')
+
+  const afterDmgCoffee = await StockBalance.findOne({
+    warehouseId: mainWh.json.data._id,
+    productId: coffee.json.data._id,
+    inventoryItemId: null,
+  }).lean()
+  assert(String(afterDmgCoffee.quantity) === '13', 'approval reduces coffee by the damage qty')
+
+  const doubleApproveDmg = await request('POST', `/api/v1/damages/${draftDmg.json.data._id}/approve`, { token })
+  assertStatus(doubleApproveDmg, 400, 'double approve damage rejected')
+
+  const rejectDmgSeed = await request('POST', '/api/v1/damages', {
+    token,
+    body: {
+      warehouseId: mainWh.json.data._id,
+      damageType: 'broken',
+      reason: 'Reject me',
+      lines: [{ productId: coffee.json.data._id, quantity: '1', unitCost: '7.65' }],
+    },
+  })
+  assertStatus(rejectDmgSeed, 201, 'create damage to reject')
+  await request('POST', `/api/v1/damages/${rejectDmgSeed.json.data._id}/submit`, { token })
+  const rejectedDmg = await request('POST', `/api/v1/damages/${rejectDmgSeed.json.data._id}/reject`, {
+    token,
+    body: { note: 'Insufficient evidence' },
+  })
+  assertStatus(rejectedDmg, 200, 'reject damage')
+  assert(rejectedDmg.json.data.statusLabel === 'Rejected', 'rejected damage status')
+  assert(rejectedDmg.json.data.movementNumbers.length === 0, 'reject creates no movements')
+  assert(rejectedDmg.json.data.history.some((row) => /Rejected/i.test(row.action)), 'history records reject')
+
+  const cancelSeed = await request('POST', '/api/v1/damages', {
+    token,
+    body: {
+      warehouseId: mainWh.json.data._id,
+      damageType: 'other',
+      reason: 'Cancel me',
+      lines: [{ productId: coffee.json.data._id, quantity: '1', unitCost: '7.65' }],
+    },
+  })
+  assertStatus(cancelSeed, 201, 'create damage to cancel')
+  const cancelledDmg = await request('POST', `/api/v1/damages/${cancelSeed.json.data._id}/cancel`, { token })
+  assertStatus(cancelledDmg, 200, 'cancel damage')
+  assert(cancelledDmg.json.data.statusLabel === 'Cancelled', 'cancelled damage status')
+  assert(cancelledDmg.json.data.workflow.cancelled.done === true, 'workflow marks cancelled')
+
+  const dmgDetail = await request('GET', `/api/v1/damages/${approvedDmg.json.data._id}`, { token })
+  assertStatus(dmgDetail, 200, 'damage detail')
+  assert(String(dmgDetail.json.data.requestedApprover?._id) === String(adminId), 'detail keeps requested approver')
+  assert(dmgDetail.json.data.lines[0].unitCost === '7.65', 'detail keeps unit cost')
+
+  const listedDmg = await request('GET', `/api/v1/damages?warehouseId=${mainWh.json.data._id}&limit=20`, {
+    token,
+  })
+  assertStatus(listedDmg, 200, 'damage list')
+  assert(
+    listedDmg.json.data.some((row) => row.damageNumber === approvedDmg.json.data.damageNumber),
+    'list includes the approved damage',
+  )
+
   const specRes = await request('GET', '/openapi.json')
   assertStatus(specRes, 200, 'openapi')
   assert(specRes.json.paths['/api/v1/stock-balances'], 'openapi documents stock balances')
@@ -650,20 +907,32 @@ try {
   assert(specRes.json.paths['/api/v1/stock-movements'], 'openapi documents stock movements')
   assert(specRes.json.paths['/api/v1/transfers'], 'openapi documents transfers')
   assert(specRes.json.paths['/api/v1/transfers/{id}/dispatch'], 'openapi documents transfer dispatch')
+  assert(specRes.json.paths['/api/v1/adjustments'], 'openapi documents adjustments')
+  assert(specRes.json.paths['/api/v1/adjustments/{id}/approve'], 'openapi documents adjustment approve')
+  assert(specRes.json.paths['/api/v1/damages'], 'openapi documents damages')
+  assert(specRes.json.paths['/api/v1/damages/{id}/approve'], 'openapi documents damage approve')
   assert(specRes.json.components.schemas.StockBalanceRegisterSummary, 'openapi documents the stock cards')
   assert(specRes.json.components.schemas.InventoryItemRegisterSummary, 'openapi documents the inventory item cards')
   assert(specRes.json.components.schemas.StockMovementRegisterSummary, 'openapi documents the movement cards')
   assert(specRes.json.components.schemas.WarehouseTransfer, 'openapi documents the transfer detail')
+  assert(specRes.json.components.schemas.StockAdjustment, 'openapi documents the adjustment detail')
+  assert(specRes.json.components.schemas.ProductDamage, 'openapi documents the damage detail')
 
   console.log('inventory checks passed')
 } finally {
   try {
     await StockAdjustment.deleteMany({ adjustmentNumber: `ADJ-INV-${stamp}` })
-    await ProductDamage.deleteMany({ damageNumber: `DMG-INV-${stamp}` })
+    await ProductDamage.deleteMany({
+      $or: [
+        { damageNumber: `DMG-INV-${stamp}` },
+        { warehouseId: { $in: [mainWh?.json?.data?._id, airportWh?.json?.data?._id].filter(Boolean) } },
+      ],
+    })
     await StockMovement.deleteMany({
       $or: [
         { movementNumber: { $in: [`MOV-INV-${stamp}`, `MOV-IN-${stamp}`, `MOV-OUT-${stamp}`] } },
         { referenceNumber: { $regex: `^TR-` } },
+        { referenceType: 'damage' },
       ],
     })
     const { WarehouseTransfer } = await import('../src/modules/inventory/warehouseTransfer.model.js')

@@ -11,6 +11,13 @@
     "check:org": "node scripts/check-organization.js",
     "check:products": "node scripts/check-products.js",
     "check:inventory": "node scripts/check-inventory.js",
+    "check:suppliers": "node scripts/check-suppliers.js",
+    "check:customers": "node scripts/check-customers.js",
+    "check:payables": "node scripts/check-payables.js",
+    "check:receivables": "node scripts/check-receivables.js",
+    "check:purchases": "node scripts/check-purchases.js",
+    "check:sales": "node scripts/check-sales.js",
+    "check:sale-returns": "node scripts/check-sale-returns.js",
     "seed": "node src/seed/run.js"
   },
   "dependencies": {

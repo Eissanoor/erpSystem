@@ -7,6 +7,8 @@ export const ORG_CACHE = {
   warehouses: 'org:warehouses',
   shops: 'org:shops',
   currencies: 'org:currencies',
+  suppliers: 'org:suppliers',
+  customers: 'org:customers',
 }
 
 export const PROD_CACHE = {

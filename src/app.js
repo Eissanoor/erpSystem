@@ -31,6 +31,15 @@ import { stockBalanceRouter } from './modules/inventory/stockBalance.routes.js'
 import { inventoryItemRouter } from './modules/inventory/inventoryItem.routes.js'
 import { stockMovementRouter } from './modules/inventory/stockMovement.routes.js'
 import { transferRouter } from './modules/inventory/transfer.routes.js'
+import { adjustmentRouter } from './modules/inventory/adjustment.routes.js'
+import { damageRouter } from './modules/inventory/damage.routes.js'
+import { supplierRouter } from './modules/supplier/supplier.routes.js'
+import { customerRouter } from './modules/customer/customer.routes.js'
+import { payablesRouter } from './modules/payables/payables.routes.js'
+import { receivablesRouter } from './modules/receivables/receivables.routes.js'
+import { purchaseRouter, purchaseReturnRouter } from './modules/purchase/purchase.routes.js'
+import { saleRouter } from './modules/sale/sale.routes.js'
+import { saleReturnRouter } from './modules/sale/saleReturn.routes.js'
 
 function requestOrigin(req) {
   const forwarded = req.get('x-forwarded-proto')
@@ -116,6 +125,16 @@ export function createApp() {
   app.use('/api/v1/inventory-items', inventoryItemRouter)
   app.use('/api/v1/stock-movements', stockMovementRouter)
   app.use('/api/v1/transfers', transferRouter)
+  app.use('/api/v1/adjustments', adjustmentRouter)
+  app.use('/api/v1/damages', damageRouter)
+  app.use('/api/v1/suppliers', supplierRouter)
+  app.use('/api/v1/customers', customerRouter)
+  app.use('/api/v1/supplier-payables', payablesRouter)
+  app.use('/api/v1/customer-receivables', receivablesRouter)
+  app.use('/api/v1/purchases', purchaseRouter)
+  app.use('/api/v1/purchase-returns', purchaseReturnRouter)
+  app.use('/api/v1/sales', saleRouter)
+  app.use('/api/v1/sale-returns', saleReturnRouter)
 
   app.use(notFound)
   app.use(errorHandler)

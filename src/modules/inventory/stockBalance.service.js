@@ -176,10 +176,10 @@ async function figures(warehouseIds, branchIds) {
   }
 
   const [damages, adjustments] = await Promise.all([
-    ProductDamage.find({ warehouseId: { $in: warehouseIds }, status: 'draft' })
-      .select('quantity unitCost')
+    ProductDamage.find({ warehouseId: { $in: warehouseIds }, status: { $in: ['draft', 'pending'] } })
+      .select('lines')
       .lean(),
-    StockAdjustment.find({ warehouseId: { $in: warehouseIds }, status: 'draft' })
+    StockAdjustment.find({ warehouseId: { $in: warehouseIds }, status: { $in: ['draft', 'pending'] } })
       .select('lines')
       .lean(),
   ])
@@ -187,9 +187,11 @@ async function figures(warehouseIds, branchIds) {
   let damagedUnits = new Decimal(0)
   let damagedValue = new Decimal(0)
   for (const damage of damages) {
-    const qty = asDecimal(damage.quantity)
-    damagedUnits = damagedUnits.plus(qty)
-    damagedValue = damagedValue.plus(qty.times(asDecimal(damage.unitCost)))
+    for (const line of damage.lines || []) {
+      const qty = asDecimal(line.quantity)
+      damagedUnits = damagedUnits.plus(qty)
+      damagedValue = damagedValue.plus(qty.times(asDecimal(line.unitCost)))
+    }
   }
 
   const countVariance = adjustments.reduce((sum, doc) => sum + (doc.lines?.length || 0), 0)
