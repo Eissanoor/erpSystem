@@ -13,6 +13,10 @@ import { packingUnitPaths } from './paths/packingUnits.js'
 import { productCategoryPaths } from './paths/productCategories.js'
 import { productPaths } from './paths/products.js'
 import { quantityUnitPaths } from './paths/quantityUnits.js'
+import { stockBalancePaths } from './paths/stockBalances.js'
+import { inventoryItemPaths } from './paths/inventoryItems.js'
+import { stockMovementPaths } from './paths/stockMovements.js'
+import { transferPaths } from './paths/transfers.js'
 
 const objectId = { type: 'string', pattern: '^[a-fA-F0-9]{24}$' }
 const objectIdArray = { type: 'array', items: objectId }
@@ -44,6 +48,10 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Quantity units', description: 'Base measurement units' },
       { name: 'Packing units', description: 'Packs converted to a quantity unit' },
       { name: 'Products', description: 'Product catalog, prices, and stock at a warehouse' },
+      { name: 'Stock balances', description: 'Inventory control, available stock, and today’s movements' },
+      { name: 'Inventory items', description: 'Batch, serial, expiry, and availability by warehouse' },
+      { name: 'Stock movements', description: 'Posted stock increases and decreases by source document' },
+      { name: 'Transfers', description: 'Warehouse transfers, dispatch, and receive' },
     ],
     paths: {
       '/health': {
@@ -77,6 +85,10 @@ export function buildOpenApiSpec(serverUrl = '/') {
       ...quantityUnitPaths,
       ...packingUnitPaths,
       ...productPaths,
+      ...stockBalancePaths,
+      ...inventoryItemPaths,
+      ...stockMovementPaths,
+      ...transferPaths,
     },
     components: {
       securitySchemes: {
@@ -353,6 +365,14 @@ export function buildOpenApiSpec(serverUrl = '/') {
             phone: { type: 'string', description: 'On warehouse and shop detail' },
             location: { type: 'string' },
             address: { type: 'string', description: 'On warehouse and shop detail' },
+          },
+        },
+        WarehouseRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Main Warehouse' },
+            code: { type: 'string' },
           },
         },
         Branch: {
@@ -1557,6 +1577,482 @@ export function buildOpenApiSpec(serverUrl = '/') {
             trackBatch: { type: 'boolean' },
             trackExpiry: { type: 'boolean' },
             status: { type: 'string', enum: ['active', 'inactive'] },
+          },
+        },
+        StockBalanceRegisterSummary: {
+          type: 'object',
+          properties: {
+            stockValue: {
+              type: 'string',
+              description: 'On-hand quantity times cost price',
+              example: '684290',
+            },
+            availableUnits: { type: 'string', example: '48612' },
+            locationCount: {
+              type: 'integer',
+              description: 'Warehouses that hold on-hand or reserved quantity',
+              example: 4,
+            },
+            lowStockSkus: {
+              type: 'integer',
+              description: 'Distinct products whose available quantity is low or critical',
+              example: 248,
+            },
+            criticalSkus: {
+              type: 'integer',
+              description: 'Distinct products whose available quantity is critical',
+              example: 31,
+            },
+            damagedUnits: {
+              type: 'string',
+              description: 'Quantity on draft product damage documents',
+              example: '82',
+            },
+            damagedValue: {
+              type: 'string',
+              description: 'Damaged units times unit cost',
+              example: '6480',
+            },
+            reconciledAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Latest stock balance updatedAt. The register shows Reconciled ….',
+            },
+          },
+        },
+        StockBalanceExceptions: {
+          type: 'object',
+          properties: {
+            lowStock: { type: 'integer', example: 248 },
+            damagedReview: { type: 'string', example: '82' },
+            countVariance: {
+              type: 'integer',
+              description: 'Lines on draft stock adjustments',
+              example: 14,
+            },
+          },
+        },
+        StockMovementTimelineItem: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            movementNumber: { type: 'string' },
+            movementType: {
+              type: 'string',
+              enum: [
+                'purchase',
+                'sale',
+                'transfer_in',
+                'transfer_out',
+                'purchase_return',
+                'sales_return',
+                'damage',
+                'adjustment',
+              ],
+            },
+            movementTypeLabel: { type: 'string', example: 'Sale issue' },
+            referenceNumber: { type: 'string', example: 'SL-00184' },
+            quantity: { type: 'string', example: '12' },
+            note: { type: 'string', example: '12 bags' },
+            movementDate: { type: 'string', format: 'date-time' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+            productId: {
+              type: 'object',
+              properties: {
+                _id: objectId,
+                name: { type: 'string' },
+                sku: { type: 'string' },
+              },
+            },
+          },
+        },
+        StockBalancePageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/StockBalanceRegisterSummary' },
+                exceptions: { $ref: '#/components/schemas/StockBalanceExceptions' },
+                timeline: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/StockMovementTimelineItem' },
+                },
+              },
+            },
+          ],
+        },
+        StockBalanceRow: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            productId: objectId,
+            sku: { type: 'string', example: 'BEV-1042' },
+            productName: { type: 'string', example: 'Arabica Coffee 1 kg' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+            onHand: { type: 'string', example: '24' },
+            reserved: { type: 'string', example: '6' },
+            available: { type: 'string', example: '18' },
+            state: { type: 'string', enum: ['critical', 'low', 'healthy', 'out_of_stock'] },
+            stateLabel: { type: 'string', example: 'Critical' },
+            costPrice: { type: 'string' },
+            reorderLevel: { type: 'string' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        InventoryItemRegisterSummary: {
+          type: 'object',
+          properties: {
+            inventoryValue: {
+              type: 'string',
+              description: 'Quantity times unit cost for active inventory items',
+              example: '684290',
+            },
+            activeBatches: { type: 'integer', example: 1284 },
+            warehouseName: {
+              type: 'string',
+              description: 'Name of the filtered warehouse, or Selected warehouses',
+              example: 'Main Warehouse',
+            },
+            expiryWithin30Days: { type: 'integer', example: 18 },
+            heldBatches: { type: 'integer', example: 12 },
+            damagedBatches: { type: 'integer', example: 4 },
+          },
+        },
+        InventoryItemStates: {
+          type: 'object',
+          description: 'Tab counts for All / Available / Hold / Damaged',
+          properties: {
+            all: { type: 'integer', example: 9 },
+            available: { type: 'integer', example: 7 },
+            hold: { type: 'integer', example: 1 },
+            damaged: { type: 'integer', example: 1 },
+          },
+        },
+        InventoryItemExpiryAttention: {
+          type: 'object',
+          nullable: true,
+          description: 'Soonest non-damaged batch that still has an expiry date.',
+          properties: {
+            _id: objectId,
+            batchNumber: { type: 'string', example: 'ML-2610-A' },
+            productName: { type: 'string', example: 'Whole Milk 1 L' },
+            sku: { type: 'string' },
+            expiryDate: { type: 'string', format: 'date-time' },
+            daysRemaining: { type: 'integer', example: 11 },
+            quantity: { type: 'string', example: '126' },
+            lineValue: { type: 'string', example: '2494.80' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+          },
+        },
+        InventoryItemPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/InventoryItemRegisterSummary' },
+                states: { $ref: '#/components/schemas/InventoryItemStates' },
+                expiryAttention: { $ref: '#/components/schemas/InventoryItemExpiryAttention' },
+              },
+            },
+          ],
+        },
+        InventoryItemRow: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            productId: objectId,
+            sku: { type: 'string', example: 'BEV-1042' },
+            productName: { type: 'string', example: 'Arabica Coffee 1 kg' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+            batchNumber: { type: 'string', example: 'CF-2609-A' },
+            serialNumber: { type: 'string', example: 'SCN-000142' },
+            expiryDate: { type: 'string', format: 'date-time', nullable: true },
+            daysRemaining: { type: 'integer', nullable: true, example: 364 },
+            quantity: { type: 'string', example: '18' },
+            unit: { $ref: '#/components/schemas/UnitRef' },
+            unitCost: { type: 'string', example: '12.40' },
+            lineValue: { type: 'string', example: '223.20' },
+            state: { type: 'string', enum: ['available', 'hold', 'damaged'] },
+            stateLabel: { type: 'string', example: 'Available' },
+            expiryRisk: {
+              type: 'string',
+              enum: ['ok', 'expiring_soon', 'quality_check', 'quarantined'],
+            },
+            expiryRiskLabel: { type: 'string', example: '364 days' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        StockMovementRegisterSummary: {
+          type: 'object',
+          properties: {
+            movementsToday: {
+              type: 'integer',
+              description: 'Movements on the selected day for the warehouse scope',
+              example: 42,
+            },
+            warehouseName: { type: 'string', example: 'Main Warehouse' },
+            quantityIn: { type: 'string', example: '1248' },
+            quantityOut: { type: 'string', example: '986' },
+            netMovement: {
+              type: 'string',
+              description: 'quantityIn minus quantityOut. Negative values keep the minus sign.',
+              example: '262',
+            },
+            date: { type: 'string', format: 'date-time', description: 'Start of the selected day (UTC)' },
+          },
+        },
+        StockMovementPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/StockMovementRegisterSummary' },
+              },
+            },
+          ],
+        },
+        StockMovementRow: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            movementNumber: { type: 'string', example: 'MV-10842' },
+            movementDate: { type: 'string', format: 'date-time' },
+            productId: objectId,
+            sku: { type: 'string', example: 'BEV-1042' },
+            productName: { type: 'string', example: 'Arabica Coffee 1 kg' },
+            unit: { $ref: '#/components/schemas/UnitRef' },
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+            movementType: {
+              type: 'string',
+              enum: [
+                'purchase',
+                'sale',
+                'transfer_in',
+                'transfer_out',
+                'purchase_return',
+                'sales_return',
+                'damage',
+                'adjustment',
+              ],
+            },
+            movementTypeLabel: { type: 'string', example: 'Sale' },
+            quantityIn: { type: 'string', nullable: true, example: '60' },
+            quantityOut: { type: 'string', nullable: true, example: '24' },
+            unitCost: { type: 'string', example: '12.40' },
+            lineValue: { type: 'string', example: '297.60' },
+            createdBy: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                _id: objectId,
+                name: { type: 'string', example: 'Omar Khalid' },
+                email: { type: 'string' },
+              },
+            },
+            referenceType: { type: 'string' },
+            referenceId: { ...objectId, nullable: true },
+            referenceNumber: { type: 'string', example: 'SL-09184' },
+            ledgerNumber: { type: 'string', example: 'JV-01846' },
+            note: { type: 'string' },
+          },
+        },
+        StockMovement: {
+          allOf: [
+            { $ref: '#/components/schemas/StockMovementRow' },
+            {
+              type: 'object',
+              properties: {
+                movementTypeDetailLabel: { type: 'string', example: 'Sale issue' },
+                direction: { type: 'string', enum: ['in', 'out'] },
+                sourceTrace: {
+                  type: 'object',
+                  properties: {
+                    referenceNumber: { type: 'string', example: 'SL-09184' },
+                    createdByName: { type: 'string', example: 'Omar Khalid' },
+                    quantity: { type: 'string', example: '24' },
+                    direction: { type: 'string', enum: ['in', 'out'] },
+                    lineValue: { type: 'string', example: '297.60' },
+                    movementDate: { type: 'string', format: 'date-time' },
+                    ledgerNumber: { type: 'string', example: 'JV-01846' },
+                  },
+                },
+              },
+            },
+          ],
+        },
+        TransferPlace: {
+          type: 'object',
+          properties: {
+            branchId: { $ref: '#/components/schemas/BranchRef' },
+            warehouseId: { $ref: '#/components/schemas/WarehouseRef' },
+            label: { type: 'string', example: 'Central Branch · Main Warehouse' },
+          },
+        },
+        TransferLine: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            productId: objectId,
+            sku: { type: 'string', example: 'BEV-1042' },
+            productName: { type: 'string', example: 'Arabica Coffee 1 kg' },
+            unit: { $ref: '#/components/schemas/UnitRef' },
+            inventoryItemId: { ...objectId, nullable: true },
+            batchNumber: { type: 'string', example: 'CF-260918' },
+            batchLabel: { type: 'string', example: 'CF-260918', description: 'Not tracked when empty' },
+            quantityRequested: { type: 'string', example: '24' },
+            quantityShipped: { type: 'string', nullable: true, example: '24' },
+            quantityReceived: { type: 'string', nullable: true },
+            unitCost: { type: 'string', example: '12.40' },
+          },
+        },
+        TransferStockImpact: {
+          type: 'object',
+          properties: {
+            sourceReduction: {
+              type: 'object',
+              properties: {
+                quantity: { type: 'string', example: '-64' },
+                state: { type: 'string', example: 'posted' },
+                stateLabel: { type: 'string', example: 'Posted' },
+              },
+            },
+            stockInTransit: {
+              type: 'object',
+              properties: {
+                quantity: { type: 'string', example: '64' },
+                state: { type: 'string', example: 'active' },
+                stateLabel: { type: 'string', example: 'Active' },
+              },
+            },
+            destinationIncrease: {
+              type: 'object',
+              properties: {
+                quantity: { type: 'string', example: '64' },
+                state: { type: 'string', example: 'on_receipt' },
+                stateLabel: { type: 'string', example: 'On receipt' },
+              },
+            },
+          },
+        },
+        WarehouseTransferListItem: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            transferNumber: { type: 'string', example: 'TR-00812' },
+            status: { type: 'string', enum: ['draft', 'in_transit', 'received', 'cancelled'] },
+            statusLabel: { type: 'string', example: 'In Transit' },
+            source: { $ref: '#/components/schemas/TransferPlace' },
+            destination: { $ref: '#/components/schemas/TransferPlace' },
+            reason: { type: 'string' },
+            expectedDate: { type: 'string', format: 'date-time', nullable: true },
+            linesMeta: {
+              type: 'object',
+              properties: {
+                lineCount: { type: 'integer', example: 4 },
+                unitCount: { type: 'string', example: '64' },
+              },
+            },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        WarehouseTransfer: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            transferNumber: { type: 'string', example: 'TR-00812' },
+            status: { type: 'string', enum: ['draft', 'in_transit', 'received', 'cancelled'] },
+            statusLabel: { type: 'string', example: 'In Transit' },
+            reason: { type: 'string', example: 'Store replenishment' },
+            vehicle: { type: 'string', example: 'VH-014' },
+            expectedDate: { type: 'string', format: 'date-time', nullable: true },
+            notes: { type: 'string' },
+            source: { $ref: '#/components/schemas/TransferPlace' },
+            destination: { $ref: '#/components/schemas/TransferPlace' },
+            accountability: {
+              type: 'object',
+              properties: {
+                requester: { type: 'object', nullable: true, properties: { _id: objectId, name: { type: 'string' }, email: { type: 'string' } } },
+                approver: { type: 'object', nullable: true, properties: { _id: objectId, name: { type: 'string' }, email: { type: 'string' } } },
+                receiver: { type: 'object', nullable: true, properties: { _id: objectId, name: { type: 'string' }, email: { type: 'string' } } },
+                receiverPending: { type: 'boolean' },
+              },
+            },
+            workflow: {
+              type: 'object',
+              properties: {
+                draft: { type: 'object', properties: { at: { type: 'string', format: 'date-time' }, done: { type: 'boolean' } } },
+                inTransit: {
+                  type: 'object',
+                  properties: {
+                    at: { type: 'string', format: 'date-time', nullable: true },
+                    done: { type: 'boolean' },
+                  },
+                },
+                received: {
+                  type: 'object',
+                  properties: {
+                    at: { type: 'string', format: 'date-time', nullable: true },
+                    done: { type: 'boolean' },
+                    awaiting: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+            lines: { type: 'array', items: { $ref: '#/components/schemas/TransferLine' } },
+            linesMeta: {
+              type: 'object',
+              properties: {
+                lineCount: { type: 'integer', example: 4 },
+                unitCount: { type: 'string', example: '64' },
+              },
+            },
+            stockImpact: { $ref: '#/components/schemas/TransferStockImpact' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        WarehouseTransferWrite: {
+          type: 'object',
+          required: ['sourceWarehouseId', 'destinationWarehouseId', 'lines'],
+          properties: {
+            sourceWarehouseId: objectId,
+            destinationWarehouseId: objectId,
+            reason: { type: 'string' },
+            vehicle: { type: 'string' },
+            expectedDate: { type: 'string', format: 'date', nullable: true },
+            notes: { type: 'string' },
+            lines: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                required: ['productId', 'quantity'],
+                properties: {
+                  productId: objectId,
+                  inventoryItemId: { ...objectId, nullable: true },
+                  batchNumber: { type: 'string' },
+                  quantity: { type: 'string', example: '24' },
+                  unitCost: { type: 'string' },
+                },
+              },
+            },
+          },
+        },
+        WarehouseTransferUpdate: {
+          type: 'object',
+          properties: {
+            reason: { type: 'string' },
+            vehicle: { type: 'string' },
+            expectedDate: { type: 'string', format: 'date', nullable: true },
+            notes: { type: 'string' },
+            lines: { type: 'array', items: { type: 'object' } },
           },
         },
         Permission: {

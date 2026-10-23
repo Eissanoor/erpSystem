@@ -16,6 +16,11 @@ import { QuantityUnit } from '../modules/quantityUnit/quantityUnit.model.js'
 import { PackingUnit } from '../modules/packingUnit/packingUnit.model.js'
 import { Product } from '../modules/product/product.model.js'
 import { StockBalance } from '../modules/inventory/stockBalance.model.js'
+import { StockMovement } from '../modules/inventory/stockMovement.model.js'
+import { ProductDamage } from '../modules/inventory/productDamage.model.js'
+import { StockAdjustment } from '../modules/inventory/stockAdjustment.model.js'
+import { InventoryItem } from '../modules/inventory/inventoryItem.model.js'
+import { WarehouseTransfer } from '../modules/inventory/warehouseTransfer.model.js'
 
 const MODULES = [
   'user',
@@ -32,6 +37,8 @@ const MODULES = [
   'quantity_unit',
   'packing_unit',
   'product',
+  'stock',
+  'transfer',
 ]
 const ACTIONS = ['create', 'read', 'update']
 
@@ -50,6 +57,13 @@ export const SEEDED_PERMISSIONS = [
     action: 'all',
     code: 'all_branches',
     description: 'Access every branch and warehouse',
+    status: 'active',
+  },
+  {
+    module: 'transfer',
+    action: 'approve',
+    code: 'transfer.approve',
+    description: 'Dispatch and receive warehouse transfers',
     status: 'active',
   },
 ]
@@ -75,6 +89,11 @@ export async function seedAuth() {
     PackingUnit.init(),
     Product.init(),
     StockBalance.init(),
+    StockMovement.init(),
+    ProductDamage.init(),
+    StockAdjustment.init(),
+    InventoryItem.init(),
+    WarehouseTransfer.init(),
   ])
 
   await Permission.bulkWrite(

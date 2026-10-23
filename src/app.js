@@ -27,6 +27,10 @@ import { productCategoryRouter } from './modules/productCategory/productCategory
 import { quantityUnitRouter } from './modules/quantityUnit/quantityUnit.routes.js'
 import { packingUnitRouter } from './modules/packingUnit/packingUnit.routes.js'
 import { productRouter } from './modules/product/product.routes.js'
+import { stockBalanceRouter } from './modules/inventory/stockBalance.routes.js'
+import { inventoryItemRouter } from './modules/inventory/inventoryItem.routes.js'
+import { stockMovementRouter } from './modules/inventory/stockMovement.routes.js'
+import { transferRouter } from './modules/inventory/transfer.routes.js'
 
 function requestOrigin(req) {
   const forwarded = req.get('x-forwarded-proto')
@@ -108,6 +112,10 @@ export function createApp() {
   app.use('/api/v1/quantity-units', quantityUnitRouter)
   app.use('/api/v1/packing-units', packingUnitRouter)
   app.use('/api/v1/products', productRouter)
+  app.use('/api/v1/stock-balances', stockBalanceRouter)
+  app.use('/api/v1/inventory-items', inventoryItemRouter)
+  app.use('/api/v1/stock-movements', stockMovementRouter)
+  app.use('/api/v1/transfers', transferRouter)
 
   app.use(notFound)
   app.use(errorHandler)
