@@ -8,6 +8,7 @@ const barcode = Joi.string().trim().allow('', null).max(64)
 
 export const productListQuery = listQuery(MASTER_STATUS).keys({
   categoryId: objectId,
+  warehouseId: objectId,
 })
 
 export const createProductBody = Joi.object({

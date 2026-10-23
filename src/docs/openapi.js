@@ -43,7 +43,7 @@ export function buildOpenApiSpec(serverUrl = '/') {
       { name: 'Product categories', description: 'Product classification tree' },
       { name: 'Quantity units', description: 'Base measurement units' },
       { name: 'Packing units', description: 'Packs converted to a quantity unit' },
-      { name: 'Products', description: 'Product master, without stock quantities' },
+      { name: 'Products', description: 'Product catalog, prices, and stock at a warehouse' },
     ],
     paths: {
       '/health': {
@@ -1227,15 +1227,93 @@ export function buildOpenApiSpec(serverUrl = '/') {
             },
           },
         },
+        CategoryRegisterSummary: {
+          type: 'object',
+          properties: {
+            total: { type: 'integer', example: 26 },
+            active: { type: 'integer', example: 24 },
+            inactive: { type: 'integer', example: 2 },
+            topLevel: { type: 'integer', description: 'Categories with no parent', example: 3 },
+            withParent: { type: 'integer', description: 'Categories that have a parent', example: 23 },
+            updatedAt: { type: 'string', format: 'date-time', nullable: true },
+          },
+        },
+        CategoryPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/CategoryRegisterSummary' },
+              },
+            },
+          ],
+        },
+        CategoryRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Food & Beverage' },
+            code: { type: 'string', example: 'CAT-FB' },
+          },
+        },
+        CategoryChild: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Coffee' },
+            code: { type: 'string', example: 'CAT-COF' },
+            status: { type: 'string', enum: ['active', 'inactive'] },
+            statusLabel: { type: 'string', example: 'Active' },
+          },
+        },
+        CategoryProduct: {
+          type: 'object',
+          description: 'Product assigned directly to this category.',
+          properties: {
+            _id: objectId,
+            name: { type: 'string', example: 'Arabica Coffee 1 kg' },
+            sku: { type: 'string', example: 'BEV-1042' },
+            quantityUnitId: { $ref: '#/components/schemas/UnitRef' },
+          },
+        },
         ProductCategory: {
           type: 'object',
           properties: {
             _id: objectId,
-            name: { type: 'string' },
-            code: { type: 'string' },
+            name: { type: 'string', example: 'Beverages' },
+            code: { type: 'string', example: 'CAT-BEV' },
             parentId: { ...objectId, nullable: true },
-            description: { type: 'string' },
+            parent: {
+              anyOf: [{ $ref: '#/components/schemas/CategoryRef' }, { type: 'null' }],
+              description: 'Parent category. Null for a top-level category. Present on the register and the detail.',
+            },
+            description: { type: 'string', example: 'Coffee, water, and packaged drinks' },
             status: { type: 'string', enum: ['active', 'inactive'] },
+            statusLabel: { type: 'string', example: 'Active' },
+            level: {
+              type: 'integer',
+              description: '1 is a top-level category. A child is one deeper than its parent.',
+              example: 1,
+            },
+            childCount: { type: 'integer', description: 'Direct child categories. 0 on a new category.', example: 0 },
+            breadcrumb: {
+              type: 'array',
+              description: 'Detail only. Path from the top-level category to this one.',
+              items: { $ref: '#/components/schemas/CategoryRef' },
+            },
+            children: {
+              type: 'array',
+              description: 'Detail only. Direct child categories.',
+              items: { $ref: '#/components/schemas/CategoryChild' },
+            },
+            productCount: { type: 'integer', description: 'Detail only. Products assigned directly to this category.', example: 2 },
+            products: {
+              type: 'array',
+              description: 'Detail only.',
+              items: { $ref: '#/components/schemas/CategoryProduct' },
+            },
+            productsMeta: { $ref: '#/components/schemas/PageMeta' },
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
           },
@@ -1300,6 +1378,19 @@ export function buildOpenApiSpec(serverUrl = '/') {
             shortCode: { type: 'string' },
           },
         },
+        PackingRef: {
+          type: 'object',
+          properties: {
+            _id: objectId,
+            name: { type: 'string' },
+            shortCode: { type: 'string' },
+            conversionQuantity: {
+              type: 'string',
+              description: 'Base units in one packing unit. 12 means 1 packing unit = 12 base units.',
+              example: '12',
+            },
+          },
+        },
         PackingUnit: {
           type: 'object',
           properties: {
@@ -1342,6 +1433,55 @@ export function buildOpenApiSpec(serverUrl = '/') {
             code: { type: 'string' },
           },
         },
+        ProductRegisterSummary: {
+          type: 'object',
+          properties: {
+            active: {
+              type: 'object',
+              properties: {
+                total: { type: 'integer', description: 'Active products in the catalog', example: 3846 },
+                addedThisMonth: {
+                  type: 'integer',
+                  description: 'Active products created since the first day of this month (UTC)',
+                  example: 42,
+                },
+              },
+            },
+            inventoryValue: {
+              type: 'string',
+              description: 'On-hand quantity times cost price for the selected warehouse scope',
+              example: '684290',
+            },
+            lowStock: {
+              type: 'integer',
+              description: 'Active products at the warehouse whose reorder state is low or critical',
+              example: 248,
+            },
+            lowStockShare: {
+              type: 'string',
+              description: 'lowStock as a percent of active products, one decimal. 6.4 means 6.4%.',
+              example: '6.4',
+            },
+            inactive: { type: 'integer', description: 'Inactive products in the catalog', example: 61 },
+            updatedAt: {
+              type: 'string',
+              format: 'date-time',
+              nullable: true,
+              description: 'Latest product updatedAt. The catalog uses this for Updated … ago.',
+            },
+          },
+        },
+        ProductPageMeta: {
+          allOf: [
+            { $ref: '#/components/schemas/PageMeta' },
+            {
+              type: 'object',
+              properties: {
+                summary: { $ref: '#/components/schemas/ProductRegisterSummary' },
+              },
+            },
+          ],
+        },
         Product: {
           type: 'object',
           properties: {
@@ -1352,10 +1492,25 @@ export function buildOpenApiSpec(serverUrl = '/') {
             barcode: { type: 'string', nullable: true },
             description: { type: 'string', description: 'Omitted from list responses' },
             quantityUnitId: { $ref: '#/components/schemas/UnitRef' },
-            packingUnitId: { anyOf: [{ $ref: '#/components/schemas/UnitRef' }, { type: 'null' }] },
-            costPrice: { type: 'string', example: '10.50' },
-            salePrice: { type: 'string', example: '15.00' },
+            packingUnitId: {
+              anyOf: [{ $ref: '#/components/schemas/PackingRef' }, { type: 'null' }],
+              description: 'Default packing unit. Empty when the product is counted in the base unit only.',
+            },
+            costPrice: { type: 'string', example: '12.40' },
+            salePrice: { type: 'string', example: '18.90' },
             reorderLevel: { type: 'string', example: '0' },
+            available: {
+              type: 'string',
+              description: 'Catalog only. On-hand quantity minus reserved, at warehouseId or every warehouse in scope.',
+              example: '18',
+            },
+            reserved: { type: 'string', description: 'Catalog only.', example: '6' },
+            reorderState: {
+              type: 'string',
+              enum: ['critical', 'low', 'healthy', 'out_of_stock'],
+              description: 'Catalog only.',
+            },
+            reorderStateLabel: { type: 'string', example: 'Critical', description: 'Catalog only.' },
             trackBatch: { type: 'boolean' },
             trackExpiry: { type: 'boolean' },
             status: { type: 'string', enum: ['active', 'inactive'] },
@@ -1373,7 +1528,11 @@ export function buildOpenApiSpec(serverUrl = '/') {
             barcode: { type: 'string', nullable: true },
             description: { type: 'string' },
             quantityUnitId: objectId,
-            packingUnitId: { ...objectId, nullable: true },
+            packingUnitId: {
+              ...objectId,
+              nullable: true,
+              description: 'Default packing unit. Omit it to use the base unit only. Its conversionQuantity is the base units per packing unit.',
+            },
             costPrice: { type: 'string', example: '10.50' },
             salePrice: { type: 'string', example: '15.00' },
             reorderLevel: { type: 'string', example: '0' },

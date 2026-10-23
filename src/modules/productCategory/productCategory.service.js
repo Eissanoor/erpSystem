@@ -5,12 +5,14 @@ import { listQuery } from '../../common/utils/listQuery.js'
 import { pick } from '../../common/utils/pick.js'
 import { rethrowDuplicate } from '../../common/utils/duplicateKey.js'
 import { cache } from '../../common/utils/cache.js'
-import { MASTER_TTL_SECONDS, PROD_CACHE, clearOrgCache } from '../../common/utils/masterListCache.js'
+import { MASTER_TTL_SECONDS, PROD_CACHE, clearOrgCache, isDropdownList } from '../../common/utils/masterListCache.js'
+import { Product } from '../product/product.model.js'
 import { ProductCategory } from './productCategory.model.js'
 
 const SORT_FIELDS = ['name', 'code', 'status', 'createdAt']
-const LIST_FIELDS = 'name code parentId status createdAt updatedAt'
+const LIST_FIELDS = 'name code parentId description status createdAt updatedAt'
 const DETAIL_FIELDS = 'name code parentId description status createdAt updatedAt'
+const STATUS_LABELS = { active: 'Active', inactive: 'Inactive' }
 const WRITE_FIELDS = ['name', 'code', 'parentId', 'description', 'status']
 const TREE_KEY = `${PROD_CACHE.categories}:tree`
 
@@ -64,19 +66,124 @@ function buildTree(rows) {
   return roots
 }
 
+function statusLabel(status) {
+  return STATUS_LABELS[status] || ''
+}
+
+function treeOrder(rows) {
+  const byParent = new Map()
+  for (const row of rows) {
+    const key = row.parentId ? String(row.parentId) : ''
+    const list = byParent.get(key) || []
+    list.push(row)
+    byParent.set(key, list)
+  }
+  for (const list of byParent.values()) {
+    list.sort((left, right) => left.name.localeCompare(right.name) || left.code.localeCompare(right.code))
+  }
+  const ordered = []
+  const seen = new Set()
+  const visit = (key) => {
+    for (const row of byParent.get(key) || []) {
+      const id = String(row._id)
+      if (seen.has(id)) continue
+      seen.add(id)
+      ordered.push(row)
+      visit(id)
+    }
+  }
+  visit('')
+  for (const key of [...byParent.keys()].filter((item) => item && !seen.has(item))) visit(key)
+  return ordered
+}
+
+async function childCounts() {
+  const rows = await ProductCategory.aggregate([
+    { $match: { parentId: { $ne: null } } },
+    { $group: { _id: '$parentId', count: { $sum: 1 } } },
+  ])
+  return new Map(rows.map((row) => [String(row._id), row.count]))
+}
+
+async function parentRefs(rows) {
+  const ids = [...new Set(rows.map((row) => (row.parentId ? String(row.parentId) : '')).filter(Boolean))]
+  if (!ids.length) return new Map()
+  const parents = await ProductCategory.find({ _id: { $in: ids } }).select('name code').lean()
+  return new Map(parents.map((parent) => [String(parent._id), parent]))
+}
+
+function presentRow(row, parents, counts) {
+  const parent = row.parentId ? parents.get(String(row.parentId)) : null
+  return {
+    ...row,
+    parentId: row.parentId || null,
+    parent: parent ? { _id: parent._id, name: parent.name, code: parent.code } : null,
+    description: row.description || '',
+    statusLabel: statusLabel(row.status),
+    childCount: counts.get(String(row._id)) || 0,
+  }
+}
+
+async function figures() {
+  const [total, active, inactive, topLevel, latest] = await Promise.all([
+    ProductCategory.countDocuments(),
+    ProductCategory.countDocuments({ status: 'active' }),
+    ProductCategory.countDocuments({ status: 'inactive' }),
+    ProductCategory.countDocuments({ parentId: null }),
+    ProductCategory.findOne().sort({ updatedAt: -1 }).select('updatedAt').lean(),
+  ])
+  return {
+    total,
+    active,
+    inactive,
+    topLevel,
+    withParent: total - topLevel,
+    updatedAt: latest?.updatedAt || null,
+  }
+}
+
 async function loadCategory(id) {
   const category = await ProductCategory.findById(id).select(DETAIL_FIELDS).lean()
   return assertFound(category, 'Category not found')
 }
 
+async function applyParentFilter(filter, parentId) {
+  if (!parentId) return
+  if (parentId === 'none') {
+    filter.parentId = null
+    return
+  }
+  const parent = await ProductCategory.findById(parentId).select('_id').lean()
+  if (!parent) {
+    throw new ApiError(400, 'Unknown category', [
+      { field: 'parentId', message: 'Parent category does not exist' },
+    ])
+  }
+  filter.parentId = parentId
+}
+
 export async function list(query) {
   const page = pagination(query, SORT_FIELDS)
   const filter = listQuery(query, { searchFields: ['name', 'code'] })
-  const [items, total] = await Promise.all([
-    ProductCategory.find(filter).select(LIST_FIELDS).sort(page.sort).skip(page.skip).limit(page.limit).lean(),
-    ProductCategory.countDocuments(filter),
-  ])
-  return { items, meta: page.meta(total) }
+  await applyParentFilter(filter, query.parentId)
+  const counts = await childCounts()
+  let rows
+  let total
+  if (query.sort) {
+    ;[rows, total] = await Promise.all([
+      ProductCategory.find(filter).select(LIST_FIELDS).sort(page.sort).skip(page.skip).limit(page.limit).lean(),
+      ProductCategory.countDocuments(filter),
+    ])
+  } else {
+    const matched = await ProductCategory.find(filter).select(LIST_FIELDS).lean()
+    const ordered = treeOrder(matched)
+    total = ordered.length
+    rows = ordered.slice(page.skip, page.skip + page.limit)
+  }
+  const parents = await parentRefs(rows)
+  const result = { items: rows.map((row) => presentRow(row, parents, counts)), meta: page.meta(total) }
+  if (isDropdownList(query) && !query.parentId) return result
+  return { items: result.items, meta: { ...result.meta, summary: await figures() } }
 }
 
 export async function tree() {
@@ -89,8 +196,65 @@ export async function tree() {
   })
 }
 
-export async function getById(id) {
-  return loadCategory(id)
+async function breadcrumb(category) {
+  const trail = []
+  const seen = new Set()
+  let current = category
+  while (current) {
+    const id = String(current._id)
+    if (seen.has(id)) break
+    seen.add(id)
+    trail.push({ _id: current._id, name: current.name, code: current.code })
+    if (!current.parentId) break
+    current = await ProductCategory.findById(current.parentId).select('name code parentId').lean()
+  }
+  return trail.reverse()
+}
+
+function pageProducts(query) {
+  const page = Math.max(1, Number(query?.page) || 1)
+  const limit = Math.min(100, Math.max(1, Number(query?.limit) || 20))
+  return { page, limit, skip: (page - 1) * limit }
+}
+
+export async function getById(id, query = {}) {
+  const category = await loadCategory(id)
+  const productPage = pageProducts(query)
+  const trail = await breadcrumb(category)
+  const [parentDoc, children, productCount, products] = await Promise.all([
+    category.parentId
+      ? ProductCategory.findById(category.parentId).select('name code').lean()
+      : null,
+    ProductCategory.find({ parentId: category._id }).select('name code status').sort({ name: 1 }).lean(),
+    Product.countDocuments({ categoryId: category._id }),
+    Product.find({ categoryId: category._id })
+      .select('name sku quantityUnitId')
+      .populate({ path: 'quantityUnitId', select: 'name shortCode' })
+      .sort({ name: 1 })
+      .skip(productPage.skip)
+      .limit(productPage.limit)
+      .lean(),
+  ])
+  return {
+    ...category,
+    parentId: category.parentId || null,
+    parent: parentDoc ? { _id: parentDoc._id, name: parentDoc.name, code: parentDoc.code } : null,
+    description: category.description || '',
+    statusLabel: statusLabel(category.status),
+    level: trail.length,
+    breadcrumb: trail,
+    childCount: children.length,
+    children: children.map((child) => ({
+      _id: child._id,
+      name: child.name,
+      code: child.code,
+      status: child.status,
+      statusLabel: statusLabel(child.status),
+    })),
+    productCount,
+    products,
+    productsMeta: { page: productPage.page, limit: productPage.limit, total: productCount },
+  }
 }
 
 export async function create(body) {
@@ -104,7 +268,7 @@ export async function create(body) {
       status: body.status || 'active',
     })
     clearCategoryCache()
-    return loadCategory(category._id)
+    return getById(category._id)
   } catch (error) {
     rethrowDuplicate(error, 'code', 'Category code already exists')
   }

@@ -3,7 +3,7 @@ import { validate } from '../../common/middleware/validate.js'
 import { authenticate } from '../../common/middleware/authenticate.js'
 import { authorize } from '../../common/middleware/authorize.js'
 import { idParams, masterStatusBody } from '../../common/validation/common.js'
-import { categoryListQuery, createCategoryBody, updateCategoryBody } from './productCategory.validation.js'
+import { categoryDetailQuery, categoryListQuery, createCategoryBody, updateCategoryBody } from './productCategory.validation.js'
 import * as categoryController from './productCategory.controller.js'
 
 export const productCategoryRouter = Router()
@@ -35,7 +35,7 @@ productCategoryRouter.get(
   '/:id',
   authenticate,
   authorize('product_category', 'read'),
-  validate({ params: idParams }),
+  validate({ params: idParams, query: categoryDetailQuery }),
   categoryController.getById,
 )
 

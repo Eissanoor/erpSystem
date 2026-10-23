@@ -13,7 +13,7 @@ export const tree = asyncHandler(async (req, res) => {
 })
 
 export const getById = asyncHandler(async (req, res) => {
-  const data = await categoryService.getById(req.params.id)
+  const data = await categoryService.getById(req.params.id, req.query)
   sendSuccess(res, { message: 'Category fetched', data })
 })
 

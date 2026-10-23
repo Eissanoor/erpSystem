@@ -15,6 +15,7 @@ import { ProductCategory } from '../modules/productCategory/productCategory.mode
 import { QuantityUnit } from '../modules/quantityUnit/quantityUnit.model.js'
 import { PackingUnit } from '../modules/packingUnit/packingUnit.model.js'
 import { Product } from '../modules/product/product.model.js'
+import { StockBalance } from '../modules/inventory/stockBalance.model.js'
 
 const MODULES = [
   'user',
@@ -73,6 +74,7 @@ export async function seedAuth() {
     QuantityUnit.init(),
     PackingUnit.init(),
     Product.init(),
+    StockBalance.init(),
   ])
 
   await Permission.bulkWrite(

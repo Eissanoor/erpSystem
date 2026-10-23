@@ -5,7 +5,14 @@ import { listQuery, locationCode, objectId } from '../../common/validation/commo
 const name = Joi.string().trim().min(1).max(120)
 const description = Joi.string().trim().allow('').max(2000)
 
-export const categoryListQuery = listQuery(MASTER_STATUS)
+export const categoryListQuery = listQuery(MASTER_STATUS).keys({
+  parentId: Joi.alternatives().try(Joi.string().valid('none'), objectId),
+})
+
+export const categoryDetailQuery = Joi.object({
+  page: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(1).max(100),
+})
 
 export const createCategoryBody = Joi.object({
   name: name.required(),
